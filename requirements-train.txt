@@ -1,0 +1,10 @@
+# Colab / GPU: training + inference + eval (Στάδια 2-4)
+torch
+transformers>=4.44
+trl>=0.11
+peft>=0.12
+bitsandbytes
+accelerate
+datasets
+# προαιρετικά για eval
+bert-score

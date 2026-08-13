@@ -1,0 +1,19 @@
+# Μυστικά
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+
+# Δεδομένα (μεγάλα / τρίτων — παράγονται από το pipeline, δεν μπαίνουν σε git)
+data/
+
+# Artifacts εκπαίδευσης/αξιολόγησης (παράγονται στο Colab)
+adapters/
+preds/
+results/
+
+# macOS
+.DS_Store
