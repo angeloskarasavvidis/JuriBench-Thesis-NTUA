@@ -66,8 +66,26 @@ def main():
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
 
+    def _merge_system(msgs):
+        sys_txt = "\n\n".join(m["content"] for m in msgs if m["role"] == "system")
+        out = []
+        for m in msgs:
+            if m["role"] == "system":
+                continue
+            if m["role"] == "user" and sys_txt and not any(o["role"] == "user" for o in out):
+                out.append({"role": "user", "content": sys_txt + "\n\n" + m["content"]})
+            else:
+                out.append(m)
+        return out
+
+    def _render_one(msgs):
+        try:
+            return tok.apply_chat_template(msgs, tokenize=False)
+        except Exception:
+            return tok.apply_chat_template(_merge_system(msgs), tokenize=False)
+
     def render(rows):
-        texts = [tok.apply_chat_template(r["messages"], tokenize=False) for r in rows]
+        texts = [_render_one(r["messages"]) for r in rows]
         return Dataset.from_dict({"text": texts})
 
     train_ds = render(load_messages(data_dir / "train.jsonl", args.max_train))

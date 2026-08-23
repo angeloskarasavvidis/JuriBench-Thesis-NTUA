@@ -30,6 +30,29 @@ def parse_disposition(text):
     return "unclear"
 
 
+def merge_system(msgs):
+    sys_txt = "\n\n".join(m["content"] for m in msgs if m["role"] == "system")
+    out = []
+    for m in msgs:
+        if m["role"] == "system":
+            continue
+        if m["role"] == "user" and sys_txt and not any(o["role"] == "user" for o in out):
+            out.append({"role": "user", "content": sys_txt + "\n\n" + m["content"]})
+        else:
+            out.append(m)
+    return out
+
+
+def encode_prompt(tok, msgs):
+    msgs = [m for m in msgs if m["role"] != "assistant"]
+    try:
+        return tok.apply_chat_template(msgs, add_generation_prompt=True,
+                                       return_tensors="pt", return_dict=True)
+    except Exception:
+        return tok.apply_chat_template(merge_system(msgs), add_generation_prompt=True,
+                                       return_tensors="pt", return_dict=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", required=True)
@@ -67,9 +90,7 @@ def main():
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         for i, r in enumerate(rows, 1):
-            prompt_msgs = [m for m in r["messages"] if m["role"] != "assistant"]
-            enc = tok.apply_chat_template(prompt_msgs, add_generation_prompt=True,
-                                          return_tensors="pt", return_dict=True)
+            enc = encode_prompt(tok, r["messages"])
             enc = {k: v.to(model.device) for k, v in enc.items()}
             plen = enc["input_ids"].shape[1]
             with torch.no_grad():

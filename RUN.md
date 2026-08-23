@@ -19,26 +19,36 @@ python3 code/build_finetune.py --max-target-chars 8000
 
 ## B. Google Colab — setup (κάθε session)
 
-1. Colab → **Runtime → Change runtime type → GPU** (T4 free, ή L4/A100 με Pro).
-2. Φέρε το `JuriBench/` μέσα στο Colab. Δύο τρόποι:
+Ροή: **κώδικας από GitHub, δεδομένα από Drive.** Πρώτα Runtime → Change runtime type → GPU.
+Μετά το ένα setup-κελί (κάνει clone + «δένει» data/outputs με το Drive):
 
-   **(i) Google Drive** (απλό): ανέβασε τον φάκελο `JuriBench` στο Drive σου, μετά:
-   ```python
-   from google.colab import drive; drive.mount('/content/drive')
-   %cd /content/drive/MyDrive/JuriBench
-   ```
+```python
+from google.colab import drive
+drive.mount('/content/drive')
 
-   **(ii) Git** (αν το έχεις σε repo): `!git clone <repo> && %cd JuriBench`
+DRIVE = "/content/drive/MyDrive/University/Διπλωματική/JuriBench"   # ο φάκελος με τα data
 
-3. Εξαρτήσεις:
-   ```python
-   !pip install -q -r requirements-train.txt
-   ```
+%cd /content
+!rm -rf JuriBench-Thesis-NTUA
+!git clone https://github.com/angeloskarasavvidis/JuriBench-Thesis-NTUA.git
+%cd JuriBench-Thesis-NTUA
 
-4. (Μόνο για Llama, που είναι gated) Hugging Face login + αποδοχή license στη σελίδα του μοντέλου:
-   ```python
-   from huggingface_hub import login; login()   # βάλε HF token
-   ```
+import os
+os.system(f'ln -sfn "{DRIVE}/data" data')
+for d in ["adapters", "preds", "results"]:
+    os.makedirs(f"{DRIVE}/{d}", exist_ok=True)
+    os.system(f'ln -sfn "{DRIVE}/{d}" {d}')
+
+!pip install -q -r requirements-train.txt
+!ls data     # έλεγχος: splits, finetune, juribench_cases.csv ...
+```
+
+Όταν ο βοηθός κάνει διορθώσεις (push στο GitHub): αρκεί `!git pull` (ή ξανά το setup-κελί).
+
+(Μόνο για Llama, gated) HF login + αποδοχή license:
+```python
+from huggingface_hub import login; login()
+```
 
 ---
 
