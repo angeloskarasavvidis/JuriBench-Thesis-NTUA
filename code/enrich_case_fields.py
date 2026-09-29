@@ -37,7 +37,9 @@ import csv
 import json
 import os
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 try:
@@ -157,7 +159,10 @@ def main():
     ap.add_argument("--output", default=None)
     ap.add_argument("--limit",  type=int, default=0, help="process at most N to-do rows (pilot)")
     ap.add_argument("--flush-every", type=int, default=10)
-    ap.add_argument("--sleep", type=float, default=0.5, help="seconds between calls")
+    ap.add_argument("--sleep", type=float, default=0.5,
+                    help="seconds between calls (μόνο για --workers 1· αγνοείται στο parallel)")
+    ap.add_argument("--workers", type=int, default=8,
+                    help="ταυτόχρονες κλήσεις LLM (1 = παλιά σειριακή συμπεριφορά)")
     args = ap.parse_args()
 
     root = Path(__file__).parent.parent
@@ -192,25 +197,59 @@ def main():
     print(f"Input : {src}")
     print(f"Loaded: {len(rows)} rows | to-do: {len(todo)} | model: {model}")
 
-    def save():
-        with open(output_path, "w", newline="", encoding="utf-8") as f:
-            w = csv.DictWriter(f, fieldnames=fieldnames)
-            w.writeheader(); w.writerows(rows)
+    save_lock = threading.Lock()
 
-    done = 0
-    for i, row in enumerate(todo, 1):
+    def save():
+        # κλείδωμα: πολλά threads μπορεί να ζητήσουν save ταυτόχρονα
+        with save_lock:
+            with open(output_path, "w", newline="", encoding="utf-8") as f:
+                w = csv.DictWriter(f, fieldnames=fieldnames)
+                w.writeheader(); w.writerows(rows)
+
+    def work(row):
+        """Μία υπόθεση: κλήση LLM + εφαρμογή αποτελέσματος πάνω στο row. Thread-safe:
+        κάθε thread γράφει ΜΟΝΟ στο δικό του row (χωριστά dict keys)."""
         body = build_body(row.get("opinion_text"))
         if not body:
-            continue
+            return None
         res = generate(body, model, base_url, api_key)
         apply_result(row, res)
-        done += 1
-        print(f"  [{i}/{len(todo)}] {row.get('case_name','')[:45]:<45} "
-              f"disp={row['disposition']:<10} issue={'Y' if row['issue_text'] else '-'} "
-              f"facts={'Y' if row['facts'] else '-'}")
-        if done % args.flush_every == 0:
-            save()
-        time.sleep(args.sleep)
+        return row
+
+    done = 0
+    if args.workers <= 1:
+        # ── σειριακό (παλιά συμπεριφορά) ──
+        for i, row in enumerate(todo, 1):
+            r = work(row)
+            if r is None:
+                continue
+            done += 1
+            print(f"  [{i}/{len(todo)}] {row.get('case_name','')[:45]:<45} "
+                  f"disp={row['disposition']:<10} issue={'Y' if row['issue_text'] else '-'} "
+                  f"facts={'Y' if row['facts'] else '-'}")
+            if done % args.flush_every == 0:
+                save()
+            time.sleep(args.sleep)
+    else:
+        # ── παράλληλο: πολλές ταυτόχρονες κλήσεις LLM ──
+        print(f"Parallel mode: {args.workers} workers")
+        with ThreadPoolExecutor(max_workers=args.workers) as ex:
+            futures = {ex.submit(work, row): row for row in todo}
+            for fut in as_completed(futures):
+                row = futures[fut]
+                try:
+                    r = fut.result()
+                except Exception as e:
+                    print(f"    worker error: {type(e).__name__}: {e}")
+                    r = None
+                if r is None:
+                    continue
+                done += 1
+                print(f"  [{done}/{len(todo)}] {row.get('case_name','')[:45]:<45} "
+                      f"disp={row['disposition']:<10} issue={'Y' if row['issue_text'] else '-'} "
+                      f"facts={'Y' if row['facts'] else '-'}")
+                if done % args.flush_every == 0:
+                    save()
 
     save()
     have_issue = sum(1 for r in rows if (r.get("issue_text") or "").strip())
