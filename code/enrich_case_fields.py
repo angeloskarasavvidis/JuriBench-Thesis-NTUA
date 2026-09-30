@@ -86,15 +86,19 @@ OPINION:
 JSON:"""
 
 
-def build_body(opinion_text):
+def build_body(opinion_text, head=HEAD_CHARS, tail=TAIL_CHARS):
     t = (opinion_text or "").strip()
-    if len(t) <= HEAD_CHARS + TAIL_CHARS:
+    if len(t) <= head + tail:
         return t
-    return t[:HEAD_CHARS] + "\n...\n" + t[-TAIL_CHARS:]
+    return t[:head] + "\n...\n" + t[-tail:]
 
 
 def generate(body, model, base_url, api_key, timeout=90):
     """OpenAI-compatible chat completion. Returns dict parsed from JSON, or {}.
+
+    Ανθεκτικό σε φθηνά μοντέλα: αν το endpoint επιστρέψει HTTP 400 (π.χ. δεν
+    υποστηρίζει το `response_format`), το αφαιρεί και ξαναδοκιμάζει — ο κώδικας
+    ούτως ή άλλως εξάγει το {...} από το κείμενο αν το JSON δεν είναι καθαρό.
 
     Για τοπικό HF μοντέλο: αντικατέστησε το σώμα αυτής της συνάρτησης με μια κλήση
     στο δικό σου pipeline (π.χ. ίδιο μοτίβο με lawma_label.py) και επίστρεψε το dict.
@@ -117,6 +121,10 @@ def generate(body, model, base_url, api_key, timeout=90):
                 wait = attempt * 10
                 print(f"    HTTP {r.status_code} — wait {wait}s ({attempt}/4)")
                 time.sleep(wait)
+                continue
+            if r.status_code == 400 and "response_format" in payload:
+                # φθηνό μοντέλο που δεν δέχεται response_format — αφαίρεσέ το & ξαναδοκίμασε
+                payload.pop("response_format", None)
                 continue
             r.raise_for_status()
             content = r.json()["choices"][0]["message"]["content"]
@@ -163,6 +171,10 @@ def main():
                     help="seconds between calls (μόνο για --workers 1· αγνοείται στο parallel)")
     ap.add_argument("--workers", type=int, default=8,
                     help="ταυτόχρονες κλήσεις LLM (1 = παλιά σειριακή συμπεριφορά)")
+    ap.add_argument("--head-chars", type=int, default=HEAD_CHARS,
+                    help="χαρακτήρες από την αρχή του opinion (μείωσε για φθηνότερο κόστος)")
+    ap.add_argument("--tail-chars", type=int, default=TAIL_CHARS,
+                    help="χαρακτήρες από το τέλος του opinion (εκεί είναι συνήθως η έκβαση)")
     args = ap.parse_args()
 
     root = Path(__file__).parent.parent
@@ -209,7 +221,7 @@ def main():
     def work(row):
         """Μία υπόθεση: κλήση LLM + εφαρμογή αποτελέσματος πάνω στο row. Thread-safe:
         κάθε thread γράφει ΜΟΝΟ στο δικό του row (χωριστά dict keys)."""
-        body = build_body(row.get("opinion_text"))
+        body = build_body(row.get("opinion_text"), args.head_chars, args.tail_chars)
         if not body:
             return None
         res = generate(body, model, base_url, api_key)
