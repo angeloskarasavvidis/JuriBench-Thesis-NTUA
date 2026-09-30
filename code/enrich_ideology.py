@@ -24,6 +24,7 @@ Usage:
 
 import argparse
 import csv
+import re
 import sys
 from pathlib import Path
 
@@ -126,12 +127,39 @@ def classify(score, threshold=IDEOLOGY_THRESHOLD):
     return "Moderate"
 
 
+_CIRCUIT_WORDS = {"first":"1","second":"2","third":"3","fourth":"4","fifth":"5",
+                  "sixth":"6","seventh":"7","eighth":"8","ninth":"9","tenth":"10",
+                  "eleventh":"11"}
+
+
+def circuit_key(s):
+    """Κανονικοποιεί ΟΠΟΙΑΔΗΠΟΤΕ μορφή δικαστηρίου σε κλειδί circuit ('5','9','dc','fed').
+    Δουλεύει για 'ca9', '9', 'Ninth Circuit', 'U.S. Court of Appeals...'. Κενό αν άγνωστο."""
+    s = (s or "").lower()
+    if not s:
+        return ""
+    if "d.c" in s or "district of columbia" in s or re.search(r"\bdc\b|\bcadc\b", s):
+        return "dc"
+    if "fed" in s or "cafc" in s:
+        return "fed"
+    for w, n in _CIRCUIT_WORDS.items():
+        if w in s:
+            return n
+    m = re.search(r"(1[01]|[1-9])", s)   # 'ca9'->9, '5'->5
+    return m.group(1) if m else ""
+
+
 def match_judjis(author_str, judjis_roster, court_name):
     if not author_str:
         return None
+    ck = circuit_key(court_name)
     best, best_score = None, 0.0
     for j in judjis_roster:
-        if court_name and j["court"] and court_name not in j["court"] and j["court"] not in court_name:
+        jk = circuit_key(j["court"])
+        # απόκλεισε ΜΟΝΟ όταν ΚΑΙ οι δύο πλευρές δίνουν σαφή, διαφορετικό circuit·
+        # αλλιώς άσε το name-match (JW>=0.92) να κρίνει (αποφεύγει το false-negative
+        # που έδινε το bulk court_id 'ca9' vs η μορφή court του JuDJIS).
+        if ck and jk and ck != jk:
             continue
         s = jellyfish.jaro_winkler_similarity(author_str.lower(), j["full_name"].lower())
         s2 = jellyfish.jaro_winkler_similarity(author_str.lower(), j["last_name"].lower())
