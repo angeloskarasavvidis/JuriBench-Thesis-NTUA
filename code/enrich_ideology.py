@@ -36,7 +36,7 @@ DATA = ROOT / "data"
 
 SCDB_PATH  = DATA / "scdb" / "SCDB_2025_01_caseCentered_Citation.csv"
 MQ_PATH    = DATA / "mqscores" / "justices.csv"
-JUDJIS_PATH = DATA / "FINAL-REPLICATION 2" / "1. circuit score construction" / "agjudge_full.csv"
+JUDJIS_PATH = DATA / "judjis" / "agjudge_full.csv"
 
 IDEOLOGY_THRESHOLD = 0.3
 JW_THRESHOLD        = 0.92
