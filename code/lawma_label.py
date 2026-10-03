@@ -139,7 +139,14 @@ def main():
     root     = Path(__file__).parent.parent
     data_dir = root / "data"
 
-    input_path  = Path(args.input) if args.input else data_dir / "juribench_dataset.csv"
+    # Default: το ΤΕΛΙΚΟ enriched αρχείο (έχει issue_text, που χρησιμοποιεί το prompt).
+    # Fallback στο παλιό juribench_dataset.csv μόνο αν δεν υπάρχει.
+    if args.input:
+        input_path = Path(args.input)
+    elif (data_dir / "juribench_cases.csv").exists():
+        input_path = data_dir / "juribench_cases.csv"
+    else:
+        input_path = data_dir / "juribench_dataset.csv"
     output_path = Path(args.output_csv) if args.output_csv else data_dir / "juribench_labeled.csv"
     val_path    = Path(args.val_csv)    if args.val_csv    else data_dir / "lawma_validation.csv"
 

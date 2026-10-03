@@ -27,7 +27,7 @@ ISSUE_AREA_LABELS = {
 
 # Per implementation-details.md §1: only these two sources are an authorized
 # ideology label origin. Anything else (e.g. an LLM fallback) is unvalidated.
-AUTHORIZED_IDEOLOGY_SOURCES = {"judis", "martin_quinn"}
+AUTHORIZED_IDEOLOGY_SOURCES = {"judjis", "martin_quinn"}   # (ήταν typo "judis" → έβγαζε ψευδή ⚠)
 
 
 def pct(n, total):
