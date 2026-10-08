@@ -12,8 +12,8 @@
 
 | # | Task | Ζητήθηκε | Status | Σημειώσεις |
 |---|---|---|---|---|
-| A1 | **Διαχωρισμός γνωμών:** `opinion_text` = μόνο majority (`020lead`) · νέες στήλες `dissent_text` (`040dissent`) και `concurrence_text` (`030concurrence`), πολλαπλές ενωμένες με κενή γραμμή | 2026-10-08 | ⏳ | Θέλει νέο streaming των bulk opinions στο labrat (τα αρχεία υπάρχουν). Δεν αλλάζει τίποτα άλλο στο CSV. |
-| A2 | Υποθέσεις μόνο με `010combined` → κείμενο ως έχει στο `opinion_text` + στήλη `combined_only = 1` | 2026-10-08 | ⏳ | Μέρος του A1. |
+| A1 | **Διαχωρισμός γνωμών:** `opinion_text` = μόνο majority (`020lead`) · νέες στήλες `dissent_text` (`040dissent`) και `concurrence_text` (`030concurrence`), πολλαπλές ενωμένες με κενή γραμμή | 2026-10-08 | 🔄 | `code/split_opinions.py` γράφτηκε + δοκιμάστηκε σε συνθετικά (2026-10-08). Εκκρεμεί τρέξιμο στο labrat. Backup αυτόματα σε `juribench_cases.pre_split.csv`, αναφορά σε `data/split_report.md`. |
+| A2 | Υποθέσεις μόνο με `010combined` → κείμενο ως έχει στο `opinion_text` + στήλη `combined_only = 1` | 2026-10-08 | 🔄 | Μέρος του A1. Αν βγουν πολλά combined_only στο SCOTUS → ίσως χρειαστεί διαχωρισμός από το κείμενο (regex «JUSTICE X, dissenting»). |
 | A3 | Να διευκρινιστεί με τον καθηγητή πού πάνε οι άλλοι τύποι γνώμης (`025plurality`, `035concurrenceinpart`, `015unamimous`, `050addendum` κ.λπ.) | 2026-10-08 | ⏳ | Ερώτηση προς Κόνιαρη πριν το A1. |
 | A4 | Μετά το A1: επανεξαγωγή `disposition` (τουλάχιστον όπου `unclear`), γιατί το παλιό tail περιείχε συχνά dissent | 2026-10-08 | ⏳ | Πιθανή αιτία του 12,8% unclear στο SCOTUS. Δική μας πρόταση. |
 | A5 | **SCOTUS ↔ SCDB μέσω docket number:** SCDB `docket` ↔ CourtListener `docket_number` → fallback `usCite` → fallback όνομα + έτος | 2026-10-08 | ⏳ | Οι 161 χωρίς match υπάρχουν στο SCDB. Το docket number υπάρχει στο bulk `dockets` (labrat). |
@@ -29,7 +29,7 @@
 | B2 | Τρέξιμο **Lawma** (issue_area circuits) | ~2026-10-03 | 👤 | Ο καθηγητής. Output: `juribench_labeled.csv` + `lawma_validation.csv`. |
 | B3 | Πρόταση μοντέλων για fine-tuning (έως ~50B) | ~2026-10-03 | ✅ 2026-10-06 | `docs/models-proposal.md`. Εκκρεμεί η αποστολή (βλ. B5). |
 | B4 | Έγγραφο μετρικών αξιολόγησης | ~2026-10-03 | ✅ 2026-10-06 | `docs/evaluation-metrics.md`. Εκκρεμεί η αποστολή (βλ. B5). |
-| B5 | Αποστολή B3 + B4 στον καθηγητή (ενιαίο .docx ή δύο αρχεία) | ~2026-10-06 | ⏳ | Να επιβεβαιωθεί αν στάλθηκαν. |
+| B5 | Αποστολή B3 + B4 στον καθηγητή | ~2026-10-06 | ✅ 2026-10-08 | Στάλθηκαν· commit+push. |
 | B6 | Εκπαίδευση μοντέλων (3–4 × 2 tasks) στο μηχάνημα του καθηγητή | ~2026-10-03 | 👤 | Μετά την οριστικοποίηση του dataset και των μοντέλων. |
 
 ## C. Dataset & κώδικας
