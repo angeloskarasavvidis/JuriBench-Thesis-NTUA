@@ -59,18 +59,18 @@ COURTS = ["SCOTUS", "CA5", "CA9"]
 # SCOTUS: «JUSTICE ALITO, with whom JUSTICE THOMAS joins, dissenting.» (ΟΧΙ «ALITO, J., dissenting»
 #         που είναι κεφαλίδα σελίδας / παραπομπή).
 # Circuits: «JONES, Circuit Judge, dissenting:»
+KW = r"(con-?\s*cur-?\s*ring|dis-?\s*sent-?\s*ing)\b"   # και «dis- senting» (παύλα αλλαγής γραμμής)
 SEP_PATTERNS = [
+    # «JUSTICE X, dissenting.» · «Justice X, with whom … join, and with whom … joins as to Parts II, III, and IV, dissenting.»
     re.compile(r"(?:(?i:chief)\s+)?(?i:justice)\s+[A-Z][A-Za-z'\-]+"
-               r"(?:\s*,\s*with\s+whom\s+[^.:;]{0,250}?\s+joins?(?:\s+[^,.]{0,120}?)?)?"
-               r"\s*,\s*(concurring|dissenting)\b"),
+               r"(?:\s*,\s*with\s+whom\s+[^:;]{0,400}?)?\s*,\s*" + KW),
     # «JONES, Circuit Judge, dissenting:» · «RICHMAN, Chief Judge, dissenting» ·
     # «ELROD, Circuit Judge, joined by SMITH, …, Circuit Judges, dissenting:» · «…, with whom … join, …»
     # + καταλήξεις/αρχικά μετά το επώνυμο: «GRAVES, JR., Circuit Judge», «NELSON, R., Circuit Judge»
     # + σκέτο «Judge» (by designation): «BAKER, Judge, concurring in part»
-    re.compile(r"\b[A-Z][A-Za-z'\-]+(?:\s*,\s*(?:Jr|JR|Sr|SR|III|II|IV|[A-Z])\.?)?\s*,\s*"
+    re.compile(r"\b[A-Z][A-Za-z'\-]+(?:\s*,\s*(?:Jr|JR|Sr|SR|III|II|IV|[A-Z](?:\.[A-Z])*)\.?)?\s*,\s*"
                r"(?:(?:Chief|Senior|Circuit|District)\s+){0,2}Judges?\s*,\s*"
-               r"(?:(?:with\s+whom\s+[^:;]{0,400}?\s+joins?|joined\s+by\s+[^:;]{0,400}?)\s*,\s*)?"
-               r"(concurring|dissenting)\b"),
+               r"(?:(?:with\s+whom\s+[^:;]{0,400}?\s+joins?|joined\s+by\s+[^:;]{0,400}?)\s*,\s*)?" + KW),
 ]
 # 1–3 tokens ονόματος/αρχικών ακριβώς πριν το επώνυμο (π.χ. «Andrew S. », «Rhesa Hawkins »)·
 # ΟΧΙ λέξεις όλο κεφαλαία (AFFIRMED) ούτε το «JUSTICE»
@@ -123,11 +123,16 @@ def words(t):
     return len((t or "").split())
 
 
+def _norm(s):
+    return re.sub(r"\s+", " ", re.sub(r"-\s+", "", s.lower()))   # «dis- senting» → «dissenting»
+
+
 def classify(m_text, tail):
-    s = re.sub(r"\s+", " ", (m_text + " " + tail).lower())
-    if "concurring in part" in s and "dissenting in part" in s:
+    s = _norm(m_text + " " + tail)
+    # «concurring in part and dissenting in part» · «concurring in the judgment in part and dissenting in part»
+    if "in part" in s and "concurring" in s and "dissenting" in s:
         return CONCUR_IN_PART
-    return DISSENT if "dissenting" in m_text.lower() else CONCUR
+    return DISSENT if _norm(m_text).rstrip().endswith("dissenting") else CONCUR
 
 
 def find_separate_opinions(text):
