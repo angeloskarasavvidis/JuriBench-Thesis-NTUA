@@ -5,21 +5,19 @@ split_opinions.py — Διαχωρισμός γνωμών ανά υπόθεση 
 Πριν: το opinion_text είχε ΜΙΑ γνώμη ανά υπόθεση, συχνά με ενωμένα majority +
 dissent + concurrence (π.χ. Thompson v. Clark τελειώνει με dissent).
 
-Μετά (στο juribench_cases.csv):
+DEFAULT = ΑΚΡΙΒΩΣ ό,τι όρισε ο καθηγητής (στο juribench_cases.csv αλλάζουν μόνο):
   opinion_text      → μόνο η majority (020lead)
   dissent_text      → όλα τα 040dissent (κενό αν δεν υπάρχουν)
   concurrence_text  → όλα τα 030concurrence (κενό αν δεν υπάρχουν)
-  combined_only     → 1 αν η υπόθεση έχει μόνο 010combined, αλλιώς 0
-  split_method      → type        : διαχωρισμός από το πεδίο type του CourtListener
-                      text_regex  : combined κείμενο χωρίστηκε από τις επικεφαλίδες
-                                    («JUSTICE X, dissenting», «Y, Circuit Judge, concurring»)
-                      none        : combined χωρίς αναγνωρίσιμες ξεχωριστές γνώμες (ως έχει)
-Πολλαπλές γνώμες ίδιου τύπου ενώνονται με μία κενή γραμμή (σειρά: opinion id / θέση).
+  combined_only     → 1 αν η υπόθεση έχει μόνο 010combined (κείμενο ΩΣ ΕΧΕΙ), αλλιώς 0
+Πολλαπλές γνώμες ίδιου τύπου ενώνονται με μία κενή γραμμή (σειρά: opinion id).
+Τύποι που δεν όρισε (035concurrenceinpart, 025plurality, 070rehearing, …) → δεν μπαίνουν πουθενά,
+μέχρι να απαντήσει (tasks.md A3). Μετρώνται στην αναφορά.
 
-Τύποι που δεν όρισε ρητά ο καθηγητής (tasks.md A3) — default, ρυθμίζεται με flags:
-  025plurality, 015unamimous → majority μόνο αν λείπει 020lead (--no-majority-fallback)
-  035concurrenceinpart       → concurrence_text (--concur-in-part concurrence|dissent|ignore)
-  υπόλοιποι (addendum, rehearing, …) → αγνοούνται (μετρώνται στην αναφορά)
+ΜΗ εγκεκριμένα, opt-in (μόνο αν το ζητήσει ο καθηγητής):
+  --text-split          χωρίζει τα 010combined από τις επικεφαλίδες + στήλη split_method
+  --majority-fallback   plurality/unanimous ως majority αν λείπει 020lead
+  --concur-in-part X    035concurrenceinpart → concurrence_text / dissent_text
 
 ΠΡΟΝΟΙΑ: στο πρώτο τρέξιμο αποθηκεύει ΟΛΕΣ τις γνώμες των υποθέσεών μας στο
 data/opinions_by_type.jsonl.gz. Κάθε επόμενο τρέξιμο (άλλες επιλογές) γίνεται με
@@ -285,17 +283,22 @@ def main():
     src.add_argument("--opinions", help="opinions-*.csv.bz2 (bulk) — 1ο τρέξιμο, γράφει dump")
     src.add_argument("--from-dump", help="data/opinions_by_type.jsonl.gz — γρήγορα επαναληπτικά τρεξίματα")
     src.add_argument("--from-csv", action="store_true",
-                     help="ΧΩΡΙΣ bulk: εφαρμόζει μόνο τον διαχωρισμό από το κείμενο στις γραμμές "
-                          "combined_only=1 του ήδη type-split juribench_cases.csv (λεπτά)")
+                     help="[ΜΗ εγκεκριμένο — μόνο αν το ζητήσει ο καθηγητής] διαχωρισμός από το κείμενο "
+                          "στις combined_only=1 του ήδη type-split αρχείου")
     ap.add_argument("--dump", default=None, help="πού γράφεται το dump (default: data/opinions_by_type.jsonl.gz)")
     ap.add_argument("--input", default=None)
     ap.add_argument("--output", default=None)
     ap.add_argument("--report", default=None)
-    ap.add_argument("--no-majority-fallback", action="store_true")
-    ap.add_argument("--concur-in-part", choices=["concurrence", "dissent", "ignore"], default="concurrence")
-    ap.add_argument("--no-text-split", action="store_true",
-                    help="μην χωρίζεις τα 010combined από το κείμενο (μένουν ως έχουν)")
+    # DEFAULT = ακριβώς ό,τι όρισε ο καθηγητής. Τα παρακάτω είναι opt-in, μόνο με έγκρισή του.
+    ap.add_argument("--majority-fallback", action="store_true",
+                    help="[opt-in] plurality/unanimous ως majority αν λείπει 020lead")
+    ap.add_argument("--concur-in-part", choices=["concurrence", "dissent", "ignore"], default="ignore",
+                    help="035concurrenceinpart: default ignore (δεν το όρισε ο καθηγητής — tasks.md A3)")
+    ap.add_argument("--text-split", action="store_true",
+                    help="[opt-in] χώρισε τα 010combined από το κείμενο (ο καθηγητής είπε: ως έχουν)")
     args = ap.parse_args()
+    args.no_text_split = not args.text_split
+    args.no_majority_fallback = not args.majority_fallback
 
     root = Path(__file__).parent.parent
     data = root / "data"
@@ -315,7 +318,10 @@ def main():
     with open(bak, encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     fieldnames = list(rows[0].keys())
-    for c in ("dissent_text", "concurrence_text", "combined_only", "split_method"):
+    new_cols = ["dissent_text", "concurrence_text", "combined_only"] + (["split_method"] if args.text_split else [])
+    if not args.text_split and "split_method" in fieldnames:
+        fieldnames.remove("split_method")
+    for c in new_cols:
         if c not in fieldnames:
             fieldnames.append(c)
     want = {str(r.get("cluster_id")) for r in rows}
@@ -326,7 +332,8 @@ def main():
     print(f"   clusters με γνώμες: {len(ops)}/{len(want)}")
 
     maj_types = [LEAD] + ([] if args.no_majority_fallback else MAJ_FALLBACK)
-    handled = set(maj_types) | {DISSENT, CONCUR, CONCUR_IN_PART, COMBINED}
+    handled = set(maj_types) | {DISSENT, CONCUR, COMBINED} | (
+        {CONCUR_IN_PART} if args.concur_in_part != "ignore" else set())
     type_count = {c: Counter() for c in COURTS}
     ignored, stats = Counter(), Counter()
     method = {c: Counter() for c in COURTS}
@@ -369,8 +376,6 @@ def main():
                 stats[f"majority από {maj} (δεν υπήρχε 020lead)"] += 1
             if len(t[maj]) > 1:
                 stats["πολλαπλές majority γνώμες (ενώθηκαν)"] += 1
-            if find_separate_opinions(new_text) and text_split(new_text):
-                stats["⚠ majority (type) που μοιάζει να περιέχει ξεχωριστή γνώμη — έλεγχος"] += 1
         elif t.get(COMBINED):
             comb = join(t[COMBINED])
             combined = "1"
@@ -397,7 +402,7 @@ def main():
         stats["opinion_text < 200 λέξεις"] += 0 < words(new_text) < 200
 
     with open(out, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
         w.writeheader()
         for r in rows:
             for c in fieldnames:
@@ -408,7 +413,8 @@ def main():
     med = lambda xs: sorted(xs)[len(xs) // 2] if xs else 0
     L = [f"# Αναφορά διαχωρισμού γνωμών — `{out.name}`", "",
          f"**Υποθέσεις:** {len(rows)} · με γνώμες στο bulk: {len(ops)} · "
-         f"text-split: {'ΟΧΙ' if args.no_text_split else 'ΝΑΙ'} · concur-in-part → {args.concur_in_part}", "",
+         f"text-split: {'ΟΧΙ' if args.no_text_split else 'ΝΑΙ'} · concur-in-part → {args.concur_in_part} · "
+         f"majority-fallback: {'ΝΑΙ' if args.majority_fallback else 'ΟΧΙ'}", "",
          "## Μέθοδος ανά δικαστήριο", "", "| Μέθοδος | " + " | ".join(COURTS) + " |",
          "|---|" + "---|" * len(COURTS)]
     for mth in sorted(set().union(*[set(m) for m in method.values()])):

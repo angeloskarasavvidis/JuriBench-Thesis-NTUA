@@ -2,15 +2,14 @@
 """
 enrich_scdb.py — SCOTUS ↔ SCDB με αλυσίδα αντιστοίχισης (αίτημα Κόνιαρη, 2026-10-08)
 -----------------------------------------------------------------------------------
-Αντικαθιστά το εύθραυστο match όνομα+έτος (enrich_ideology) και το enrich_scdb_ids.
-Σειρά (όπως ζήτησε ο καθηγητής, + το scdb_id του CourtListener πριν το όνομα+έτος):
-  1. docket      : CourtListener dockets.docket_number  ↔  SCDB `docket`   (και ±1 έτος)
-  2. uscite      : CourtListener citations (reporter «U.S.»)  ↔  SCDB `usCite`   (αν δοθεί --citations)
-  3. cl_scdb_id  : το scdb_id που έχει ήδη το CourtListener στα clusters  ↔  SCDB caseId
-  4. name_year   : κανονικοποιημένο όνομα (χωρίς «Revisions: …») + έτος
-Για ΚΑΘΕ SCOTUS υπόθεση ξαναϋπολογίζει από την αρχή (idempotent):
-  scdb_id, scdb_match, issue_area(+source=scdb), decision_direction,
-  ideology_score(+source=martin_quinn, μέσω majOpinWriter + term).
+Σειρά ΑΚΡΙΒΩΣ όπως τη ζήτησε ο καθηγητής:
+  1. docket    : CourtListener dockets.docket_number  ↔  SCDB `docket`
+  2. uscite    : CourtListener citations (reporter «U.S.»)  ↔  SCDB `usCite`   (αν δοθεί --citations)
+  3. name_year : κανονικοποιημένο όνομα (χωρίς «Revisions: …») + έτος
+Το scdb_id που έχει ήδη το CourtListener ΔΕΝ χρησιμοποιείται για αντιστοίχιση — μόνο ως
+διασταύρωση στην αναφορά (πόσα από τα matches μας συμφωνούν μαζί του).
+Για ΚΑΘΕ SCOTUS υπόθεση ξαναϋπολογίζει (idempotent): scdb_id, issue_area(+source=scdb),
+decision_direction, ideology_score(+source=martin_quinn, majOpinWriter + term).
 Χωρίς match → τα πεδία μένουν κενά. Καθόλου LLM. Τα circuits δεν αγγίζονται.
 
 Usage:
@@ -35,13 +34,18 @@ ROOT = Path(__file__).parent.parent
 DATA = ROOT / "data"
 SCDB_PATH = DATA / "scdb" / "SCDB_2025_01_caseCentered_Citation.csv"
 MQ_PATH = DATA / "mqscores" / "justices.csv"
-FIELDS = ["scdb_id", "scdb_match", "issue_area", "issue_area_source", "decision_direction",
+FIELDS = ["scdb_id", "issue_area", "issue_area_source", "decision_direction",
           "ideology_score", "ideology_source"]
 
 
 def norm_docket_tokens(s):
-    """«No. 20-1199, 21-707» → {'20-1199','21-707'} · αφαιρεί No./Nos./κενά/τελείες."""
+    """«No. 20-1199, 21-707» → {'20-1199','21-707'} · «No. 16–658.» (en dash) → {'16-658'} ·
+    «141, Orig.» / «22O141» → {'141ORIG'}."""
     s = (s or "").upper()
+    s = re.sub(r"[‐-―−]", "-", s)            # en/em dash, minus → «-»
+    orig = re.search(r"(\d+)\s*,?\s*ORIG", s) or re.fullmatch(r"\s*\d{2}O(\d+)\s*", s)
+    if orig:
+        return {orig.group(1) + "ORIG"}
     s = re.sub(r"\bNOS?\.?\s*", " ", s)
     out = set()
     for tok in re.split(r"[,;&/]|\bAND\b", s):
@@ -170,20 +174,14 @@ def main():
         docket_id, cl_sid = cl.get(cid, ("", ""))
         yr = year(r.get("date_filed"))
         hit, how = None, ""
-        # 1. docket (± 1 έτος από την ημερομηνία απόφασης)
+        # 1. docket
         for t in norm_docket_tokens(dk.get(docket_id, "")):
-            cands = [s for s in by_docket.get(t, [])
-                     if yr is None or year(s.get("dateDecision")) is None
-                     or abs(year(s.get("dateDecision")) - yr) <= 1]
-            if cands:
-                hit, how = cands[0], "docket"; break
+            if by_docket.get(t):
+                hit, how = by_docket[t][0], "docket"; break
         # 2. usCite
         if not hit and cites.get(cid) in by_cite:
             hit, how = by_cite[cites[cid]], "uscite"
-        # 3. scdb_id του CourtListener
-        if not hit and cl_sid in by_id:
-            hit, how = by_id[cl_sid], "cl_scdb_id"
-        # 4. όνομα + έτος
+        # 3. όνομα + έτος
         if not hit:
             s = by_name.get((norm_name(r.get("case_name")), yr))
             if s:
@@ -199,7 +197,7 @@ def main():
             unmatched.append((r.get("case_name", ""), dk.get(docket_id, ""), r.get("date_filed", "")))
             continue
         method[how] += 1
-        r["scdb_id"], r["scdb_match"] = hit.get("caseId", ""), how
+        r["scdb_id"] = hit.get("caseId", "")
         ia = (hit.get("issueArea") or "").strip()
         if ia:
             r["issue_area"], r["issue_area_source"] = ia, "scdb"
@@ -211,8 +209,10 @@ def main():
         if score is not None:
             r["ideology_score"], r["ideology_source"] = score, "martin_quinn"
 
+    if "scdb_match" in fieldnames:          # παλιά (μη εγκεκριμένη) στήλη → αφαίρεση
+        fieldnames.remove("scdb_match")
     with open(out, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
         w.writeheader()
         for r in rows:
             for c in fieldnames:
@@ -224,7 +224,7 @@ def main():
          f"με docket_number: {sum(1 for c in want if dk.get(cl.get(c, ('', ''))[0]))} · "
          f"με usCite: {len(cites)}" + ("" if args.citations else " (δεν δόθηκε --citations)"), "",
          "## Μέθοδος αντιστοίχισης", "", "| Μέθοδος | Υποθέσεις |", "|---|---|"]
-    for k in ["docket", "uscite", "cl_scdb_id", "name_year", "χωρίς match"]:
+    for k in ["docket", "uscite", "name_year", "χωρίς match"]:
         L.append(f"| {k} | {method[k]} |")
     L += ["", "## Κάλυψη πριν → μετά", "", "| Πεδίο | Πριν | Μετά |", "|---|---|---|"]
     for k in before:
