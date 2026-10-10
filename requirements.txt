@@ -3,6 +3,7 @@ requests
 python-dotenv
 jellyfish        # Jaro-Winkler για JuDJIS match (enrich_ideology.py)
 pandas           # dataset_stats.py
+awscli           # κατέβασμα CourtListener bulk data (aws s3 cp --no-sign-request)
 
 # Lawma issue_area labeling (lawma_label.py) — βαρύ, χωριστά:
 #   pip install torch transformers accelerate bitsandbytes

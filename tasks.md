@@ -12,14 +12,14 @@
 
 | # | Task | Ζητήθηκε | Status | Σημειώσεις |
 |---|---|---|---|---|
-| A1 | **Διαχωρισμός γνωμών:** `opinion_text` = μόνο majority (`020lead`) · νέες στήλες `dissent_text` (`040dissent`) και `concurrence_text` (`030concurrence`), πολλαπλές ενωμένες με κενή γραμμή | 2026-10-08 | ✅ 2026-10-10 | Type-split: ~1.234 με `020lead` · 9.158 (88%) μόνο `010combined` → text-split (A2). Τελικά: type 1.234 · text_regex ~1.930 · combined→none ~7.230 (καμία ξεχωριστή γνώμη). Έλεγχος `inspect_split.py`: ~0,2% πιθανά χαμένα (κυρίως en banc + αναφορές). Backups: `juribench_cases.pre_split.csv` (αρχικό), `.pre_textsplit.csv` (μετά type-split). Επανάληψη: `split_opinions.py --from-csv` (λεπτά). |
+| A1 | **Διαχωρισμός γνωμών:** `opinion_text` = μόνο majority (`020lead`) · νέες στήλες `dissent_text` (`040dissent`) και `concurrence_text` (`030concurrence`), πολλαπλές ενωμένες με κενή γραμμή | 2026-10-08 | 🔄 | **Αυστηρό rebuild τρέχει στο labrat (tmux `split`, 2026-10-10)** από το `.pre_split.csv`, γράφει και dump. Ευρήματα: ~1.234 υποθέσεις με `020lead`, 9.158 (88%) μόνο `010combined`. Μετά: έλεγχος αναφοράς → A5. (Ο μη εγκεκριμένος text-split αναιρέθηκε — βλ. A2/Q1.) |
 | A2 | Υποθέσεις μόνο με `010combined` → κείμενο ως έχει στο `opinion_text` + στήλη `combined_only = 1` | 2026-10-08 | 🔄 | **Επαναφορά στην ακριβή οδηγία (2026-10-10):** είχαμε χωρίσει ~1.930 combined από το κείμενο χωρίς έγκριση → αναιρείται. Default πλέον αυστηρό: combined ως έχουν, χωρίς `split_method`. Ο text-split μένει μόνο ως opt-in (`--text-split`) → **ερώτηση Q1**. Εκκρεμεί νέο streaming (strict + dump). |
 | A2b | Καθάρισμα κεφαλίδων σελίδας PDF μέσα στα κείμενα (CA5: «Case: … Document: … Page: … Date Filed: …»· CA9: «36 UNITED STATES V. LOPEZ») | 2026-10-10 | ⏳ | Δική μας παρατήρηση από τα δείγματα του inspect_split. Θόρυβος στο κείμενο-στόχο· δεν επηρεάζει τον διαχωρισμό. |
 | A2c | Ερώτηση προς καθηγητή: αποφάσεις **απόρριψης rehearing en banc** (σύντομη διάταξη + μεγάλα dissents, π.χ. Thompson v. City of Waco, Book People v. Wong) — κρατούνται ως έχουν (`combined→none`) ή εξαιρούνται από τον στόχο εκπαίδευσης; | 2026-10-10 | ⏳ | Εντοπίστηκαν στο inspect_split (ενότητα 1). Το script σωστά δεν τις χωρίζει (majority < 300 λέξεις). |
 | A3 | Να διευκρινιστεί με τον καθηγητή πού πάνε οι άλλοι τύποι γνώμης (`025plurality`, `035concurrenceinpart`, `015unamimous`, `050addendum` κ.λπ.) | 2026-10-08 | ⏳ | Ερώτηση προς Κόνιαρη πριν το A1. |
 | A4 | Μετά το A1: επανεξαγωγή `disposition` (τουλάχιστον όπου `unclear`), γιατί το παλιό tail περιείχε συχνά dissent | 2026-10-08 | ⏳ | Πιθανή αιτία του 12,8% unclear στο SCOTUS. Δική μας πρόταση. |
-| A5 | **SCOTUS ↔ SCDB μέσω docket number:** SCDB `docket` ↔ CourtListener `docket_number` → fallback `usCite` → fallback όνομα + έτος | 2026-10-08 | 🔄 | `code/enrich_scdb.py`. 1ο τρέξιμο (2026-10-10): scdb_id 296→691/720, 100% συμφωνία με CL scdb_id. **Διορθώθηκε (2026-10-10):** ακριβώς η σειρά του καθηγητή (αφαιρέθηκαν: βήμα CL scdb_id, έλεγχος ±1 έτους, στήλη `scdb_match`) + bug en dash «16–658» / «141, Orig.». Εκκρεμεί νέο τρέξιμο. | Οι 161 χωρίς match υπάρχουν στο SCDB. Το docket number υπάρχει στο bulk `dockets` (labrat). |
-| A6 | Συμπλήρωση `scdb_id` σε **όλες** τις υποθέσεις SCOTUS που βρίσκονται (τώρα 296/720) + issue_area / decision_direction / MQ | 2026-10-08 | ⏳ | Μαζί με το A5. |
+| A5 | **SCOTUS ↔ SCDB μέσω docket number:** SCDB `docket` ↔ CourtListener `docket_number` → fallback `usCite` → fallback όνομα + έτος | 2026-10-08 | 🔄 | `code/enrich_scdb.py`. 1ο τρέξιμο (2026-10-10): scdb_id 296→691/720, 100% συμφωνία με CL scdb_id. **Διορθώθηκε (2026-10-10):** ακριβώς η σειρά του καθηγητή (αφαιρέθηκαν: βήμα CL scdb_id, έλεγχος ±1 έτους, στήλη `scdb_match`) + bug en dash «16–658» / «141, Orig.». Εκκρεμεί νέο τρέξιμο μετά το A1 (εντολή στο CLAUDE.md «Ξεκίνα από εδώ»). |
+| A6 | Συμπλήρωση `scdb_id` σε **όλες** τις υποθέσεις SCOTUS που βρίσκονται | 2026-10-08 | 🔄 | Μαζί με το A5. 1ο τρέξιμο: 691/720. issue_area/decision_direction/MQ από το ίδιο match → Q6. |
 | A7 | **Circuits fallback ιδεολογίας:** νέες στήλες `ideology_fallback` (JCS score, αλλιώς κόμμα Προέδρου R/D) + `ideology_fallback_source` (`jcs`/`party`), για **όλους** τους circuit δικαστές | 2026-10-08 | ⏳ | **Να μην αλλάξουν** τα `ideology` / `ideology_score`. Χρειάζονται πηγές: JCS scores + κόμμα Προέδρου (FJC ή CourtListener people-db). |
 | A8 | Μετά τα A1–A7: νέο `completeness_report`, νέα αποστολή dataset στον καθηγητή | 2026-10-08 | ⏳ | Πιθανώς ο καθηγητής ξανατρέχει το Lawma πάνω στο νέο `opinion_text`. |
 
@@ -52,14 +52,15 @@
 | C1 | Νέο build dataset από bulk data (3 δικαστήρια, 2015–2024) | ~2026-09-29 | ✅ ~2026-10-01 | 10.997 → dedupe 10.395. |
 | C2 | LLM enrichment facts/issue/disposition (DeepSeek, parallel) | ~2026-10-01 | ✅ 2026-10-06 | 100% facts, 10.394 issue. Κόστος ~€7. |
 | C3 | Διόρθωση JuDJIS matching (`circuit_key`) | ~2026-10-01 | ✅ | 0 → 7.344 matches. |
-| C4 | `enrich_scdb_ids.py` (ακριβές SCOTUS↔SCDB μέσω `scdb_id`) | 2026-10-06 | ✅ | ideology SCOTUS 429→528, issue_area 458→559. Συνεχίζεται στο A5. |
+| C4 | `enrich_scdb_ids.py` (ακριβές SCOTUS↔SCDB μέσω `scdb_id`) | 2026-10-06 | ✅ | ideology SCOTUS 429→528, issue_area 458→559. **Αντικαταστάθηκε** από το `enrich_scdb.py` (A5). |
 | C5 | `completeness_report.py` | 2026-10-06 | ✅ | |
 | C6 | `lawma_label.py` default input → `juribench_cases.csv` | 2026-10-06 | ✅ | |
 | C7 | Μετά το Lawma: `completeness_report` + `make_splits` + `build_finetune` πάνω στο `juribench_labeled.csv` | ~2026-10-06 | ⏳ | Περιμένει B2 (και πιθανώς A1–A8). |
-| C8 | Προσθήκη `jellyfish`, `python-dotenv`, `awscli` στο `requirements.txt` | ~2026-10-06 | ⏳ | |
+| C8 | Προσθήκη `jellyfish`, `python-dotenv`, `awscli` στο `requirements.txt` | ~2026-10-06 | ✅ 2026-10-10 | jellyfish/python-dotenv υπήρχαν ήδη· προστέθηκε awscli. |
 | C9 | Προσαρμογή `train_qlora.py` / `generate.py` για Qwen3.5 / Gemma 4 (πολυτροπική αρχιτεκτονική, `enable_thinking=False`) | 2026-10-06 | ⏳ | Όταν κλειδώσει η λίστα μοντέλων. |
 | C10 | Prune περιττών στηλών (`court`, `judge_id`, `author_cl_id`, `syllabus`, σταθερά `*_source`) | ~2026-10-03 | 💤 | Εκκρεμεί απόφαση χρήστη. |
-| C11 | Ενημέρωση `docs/components.md` με τα νέα scripts | ~2026-10-06 | ⏳ | bulk_filter, enrich_scdb_ids, completeness_report. |
+| C11 | Ενημέρωση `docs/components.md` με τα νέα scripts | ~2026-10-06 | ✅ 2026-10-10 | bulk_filter, split_opinions, inspect_split, enrich_scdb, enrich_scdb_ids, completeness_report. |
+| C14 | Μεταφορά από Cowork σε **Claude Code** (το CLAUDE.md φορτώνεται αυτόματα) | 2026-10-10 | 🔄 | CLAUDE.md ανανεώθηκε με ενότητα «Ξεκίνα από εδώ». |
 | C12 | Διόρθωση διατύπωσης διάγνωσης στο `completeness_report` («χωρίς match» = και χωρίς scdb_id) | 2026-10-06 | ⏳ | Μικρό. |
 | C13 | Revoke εκτεθειμένου OpenRouter key + αφαίρεση hardcoded default | ~2026-09-11 | 💤 | Ο χρήστης επέλεξε να το αφήσει προς το παρόν. Repo public. |
 

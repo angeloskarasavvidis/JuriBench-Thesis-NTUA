@@ -6,10 +6,38 @@
 
 ## Scripts (`code/`)
 
-### juribench_collect.py
+### juribench_collect.py  *(παλιό — αντικαταστάθηκε από bulk_filter)*
 - **Τι κάνει:** Συλλέγει δικαστικές γνωμοδοτήσεις (SCOTUS/CA5/CA9).
 - **Πώς το κάνει (τεχνικά):** CourtListener search API, round-robin ανά μήνα, φιλτράρισμα per curiam & <500 λέξεων κατά τη συλλογή, resumable (skip seen cluster_ids).
 - **Πρόβλημα που λύνει:** Δημιουργεί αναπαραγώγιμα το πρωτογενές σώμα κειμένων.
+
+### bulk_filter.py
+- **Τι κάνει:** Φτιάχνει το dataset από τα CourtListener bulk data (SCOTUS/CA5/CA9, Published, 2015–2024, ≥500 λέξεις, όχι per curiam).
+- **Πώς το κάνει (τεχνικά):** Streaming 3 περάσματα (dockets → clusters → opinions) σε bz2 χωρίς αποσυμπίεση των ~350GB· reader με `escapechar='\\'` (Postgres export)· 1 κύρια γνώμη ανά υπόθεση· ίδιες 12 στήλες με τον collector.
+- **Πρόβλημα που λύνει:** Χωρίς όριο API (125/μέρα) και χωρίς όριο 1.000/δικαστήριο → 10.997 υποθέσεις.
+
+### split_opinions.py
+- **Τι κάνει:** Χωρίζει τις γνώμες κάθε υπόθεσης (αίτημα καθηγητή 2026-10-08): `opinion_text` = majority (`020lead`), `dissent_text` (`040dissent`), `concurrence_text` (`030concurrence`), `combined_only=1` για μόνο `010combined` (κείμενο ως έχει).
+- **Πώς το κάνει (τεχνικά):** Streaming των bulk opinions για τα cluster_ids μας, ένωση πολλαπλών με κενή γραμμή· γράφει dump `data/opinions_by_type.jsonl.gz` ώστε τα επόμενα τρεξίματα (`--from-dump`) να γίνονται σε λεπτά· διαβάζει πάντα από `juribench_cases.pre_split.csv`. Default = ακριβώς η οδηγία του καθηγητή· opt-in μόνο με έγκριση: `--text-split`, `--majority-fallback`, `--concur-in-part`.
+- **Πρόβλημα που λύνει:** Το παλιό `opinion_text` είχε ενωμένα majority + dissent + concurrence.
+
+### inspect_split.py
+- **Τι κάνει:** Έλεγχος ποιότητας του διαχωρισμού από το κείμενο (μόνο αν εγκριθεί το text-split).
+- **Πώς το κάνει (τεχνικά):** (1) υποθέσεις χωρίς διαχωρισμό που περιέχουν ύποπτη επικεφαλίδα γνώμης, (2) τυχαία δείγματα σημείων κοπής.
+- **Πρόβλημα που λύνει:** Ορατότητα στα λάθη του regex πριν χρησιμοποιηθεί.
+
+### enrich_scdb.py
+- **Τι κάνει:** SCOTUS ↔ SCDB (αίτημα καθηγητή 2026-10-08): docket → usCite → όνομα+έτος· συμπληρώνει scdb_id, issue_area, decision_direction, ιδεολογία Martin-Quinn.
+- **Πώς το κάνει (τεχνικά):** Streaming bulk clusters (cluster→docket_id) + dockets (docket_number) + προαιρετικά citations (U.S.)· normalization docket (No./Nos., en dash, «Orig.»)· το scdb_id του CourtListener μόνο ως διασταύρωση· idempotent.
+- **Πρόβλημα που λύνει:** Το match όνομα+έτος αποτύγχανε σε διαφορετικές γραφές («SEC» vs «SECURITIES AND EXCHANGE COMMISSION», «Revisions: …») → 296 → ~700 / 720.
+
+### enrich_scdb_ids.py  *(παλιό — αντικαταστάθηκε από enrich_scdb)*
+- **Τι κάνει:** SCOTUS ↔ SCDB μόνο μέσω του scdb_id των bulk clusters (296/720 είχαν).
+
+### completeness_report.py
+- **Τι κάνει:** Αναφορά πληρότητας για τον καθηγητή.
+- **Πώς το κάνει (τεχνικά):** Πληρότητα ανά πεδίο μόνο όπου εφαρμόζεται (π.χ. decision_direction μόνο SCOTUS), επίπεδα A (generation) / B (LJP) / C–D (πλήρη μεταδεδομένα πριν/μετά Lawma), διάγνωση ελλείψεων, markdown (`--md`).
+- **Πρόβλημα που λύνει:** «Πόσα λείπουν / πόσα είναι πλήρη» χωρίς να μεταφερθεί το μεγάλο αρχείο.
 
 ### dedupe_case_names.py
 - **Τι κάνει:** Αφαιρεί διπλότυπες υποθέσεις.
