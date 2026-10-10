@@ -97,7 +97,7 @@ def words(t):
 
 
 def classify(m_text, tail):
-    s = (m_text + " " + tail).lower()
+    s = re.sub(r"\s+", " ", (m_text + " " + tail).lower())
     if "concurring in part" in s and "dissenting in part" in s:
         return CONCUR_IN_PART
     return DISSENT if "dissenting" in m_text.lower() else CONCUR
@@ -167,11 +167,87 @@ def load_dump(path, want):
     return ops
 
 
+def run_from_csv(target, out, report):
+    """Διαχωρισμός από το κείμενο, κατευθείαν στο dataset (χωρίς bulk).
+    Προϋπόθεση: έχει ήδη γίνει ο type-split (υπάρχουν combined_only/dissent_text/concurrence_text).
+    Οι γραμμές combined_only=0 (από type) μένουν ως έχουν· οι combined_only=1 χωρίζονται.
+    Διαβάζει πάντα από <όνομα>.pre_textsplit.csv → επαναλήψιμο."""
+    bak = target.with_name(target.stem + ".pre_textsplit.csv")
+    if not bak.exists():
+        shutil.copy2(target, bak)
+        print(f"Backup → {bak}")
+    with open(bak, encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    fieldnames = list(rows[0].keys())
+    for c in ("dissent_text", "concurrence_text", "combined_only"):
+        if c not in fieldnames:
+            raise SystemExit(f"Λείπει η στήλη {c}: τρέξε πρώτα τον type-split (--opinions).")
+    if "split_method" not in fieldnames:
+        fieldnames.append("split_method")
+    print(f"Input : {bak} | υποθέσεις: {len(rows)}")
+
+    method = {c: Counter() for c in COURTS}
+    stats = Counter()
+    w_before, w_after = [], []
+    for r in rows:
+        jur = r.get("jurisdiction", "")
+        comb = (r.get("combined_only") or "").strip()
+        old = r.get("opinion_text", "")
+        if comb == "1":
+            sp = text_split(old)
+            if sp:
+                maj, parts = sp
+                dis = [(p, t) for p, ty, t in parts if ty == DISSENT]
+                con = [(p, t) for p, ty, t in parts if ty in (CONCUR, CONCUR_IN_PART)]
+                r.update(opinion_text=maj, dissent_text=join(dis), concurrence_text=join(con),
+                         split_method="text_regex")
+                stats["concurrence in part (text) → concurrence_text"] += sum(
+                    1 for _, ty, _ in parts if ty == CONCUR_IN_PART)
+            else:
+                r["split_method"] = "none"
+            key = "combined→" + r["split_method"]
+        elif comb == "0":
+            r["split_method"] = "type"; key = "type"
+        else:
+            r["split_method"] = "none"; key = "none (χωρίς γνώμες στο bulk)"
+        if jur in method:
+            method[jur][key] += 1
+        w_before.append(words(old)); w_after.append(words(r["opinion_text"]))
+        stats["με dissent"] += bool((r.get("dissent_text") or "").strip())
+        stats["με concurrence"] += bool((r.get("concurrence_text") or "").strip())
+        stats["opinion_text < 200 λέξεις"] += 0 < words(r["opinion_text"]) < 200
+
+    with open(out, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=fieldnames)
+        w.writeheader()
+        for r in rows:
+            for c in fieldnames:
+                r.setdefault(c, "")
+            w.writerow(r)
+
+    med = lambda xs: sorted(xs)[len(xs) // 2] if xs else 0
+    L = [f"# Αναφορά διαχωρισμού γνωμών (text-split) — `{out.name}`", "",
+         f"**Υποθέσεις:** {len(rows)}", "", "## Μέθοδος ανά δικαστήριο", "",
+         "| Μέθοδος | " + " | ".join(COURTS) + " |", "|---|" + "---|" * len(COURTS)]
+    for mth in sorted(set().union(*[set(m) for m in method.values()])):
+        L.append(f"| {mth} | " + " | ".join(str(method[c][mth]) for c in COURTS) + " |")
+    L += ["", "## Αποτέλεσμα", "", "| Μέτρηση | Πλήθος |", "|---|---|"]
+    L += [f"| {k} | {v} |" for k, v in stats.items()]
+    L += ["", f"**Median λέξεις opinion_text:** πριν {med(w_before)} → μετά {med(w_after)}"]
+    text = "\n".join(L)
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(text + "\n", encoding="utf-8")
+    print("\n" + text + f"\n\nSaved -> {out}\nReport -> {report}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--opinions", help="opinions-*.csv.bz2 (bulk) — 1ο τρέξιμο, γράφει dump")
     src.add_argument("--from-dump", help="data/opinions_by_type.jsonl.gz — γρήγορα επαναληπτικά τρεξίματα")
+    src.add_argument("--from-csv", action="store_true",
+                     help="ΧΩΡΙΣ bulk: εφαρμόζει μόνο τον διαχωρισμό από το κείμενο στις γραμμές "
+                          "combined_only=1 του ήδη type-split juribench_cases.csv (λεπτά)")
     ap.add_argument("--dump", default=None, help="πού γράφεται το dump (default: data/opinions_by_type.jsonl.gz)")
     ap.add_argument("--input", default=None)
     ap.add_argument("--output", default=None)
@@ -188,6 +264,9 @@ def main():
     out = Path(args.output) if args.output else target
     report = Path(args.report) if args.report else data / "split_report.md"
     dump = Path(args.dump) if args.dump else data / "opinions_by_type.jsonl.gz"
+
+    if args.from_csv:
+        return run_from_csv(target, out, report)
 
     # Πάντα από το ΠΡΙΝ-τον-διαχωρισμό αρχείο → επαναλήψιμο
     bak = target.with_name(target.stem + ".pre_split.csv")
