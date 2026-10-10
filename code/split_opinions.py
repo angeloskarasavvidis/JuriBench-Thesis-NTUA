@@ -69,7 +69,10 @@ SEP_PATTERNS = [
                r"(?:(?:with\s+whom\s+[^:;]{0,400}?\s+joins?|joined\s+by\s+[^:;]{0,400}?)\s*,\s*)?"
                r"(concurring|dissenting)\b"),
 ]
-MIN_MAJ_FRAC = 0.15     # η 1η ξεχωριστή γνώμη πρέπει να ξεκινά μετά το 15% του κειμένου
+# 1–3 tokens ονόματος/αρχικών ακριβώς πριν το επώνυμο (π.χ. «Andrew S. », «Rhesa Hawkins »)·
+# ΟΧΙ λέξεις όλο κεφαλαία (AFFIRMED) ούτε το «JUSTICE»
+NAME_BEFORE = re.compile(r"(?:(?<![A-Za-z])(?:[A-Z][a-z]+|[A-Z]\.)\s+){1,3}$")
+MIN_MAJ_FRAC = 0.15    # η 1η ξεχωριστή γνώμη πρέπει να ξεκινά μετά το 15% του κειμένου
 MIN_MAJ_WORDS = 300     # και η majority να έχει ≥300 λέξεις
 MIN_GAP = 300           # αγνόησε matches πιο κοντά από 300 χαρακτήρες στο προηγούμενο
 
@@ -111,7 +114,12 @@ def find_separate_opinions(text):
     hits = []
     for pat in SEP_PATTERNS:
         for m in pat.finditer(text):
-            hits.append((m.start(), classify(m.group(0), text[m.end():m.end() + 60])))
+            start = m.start()
+            # «Andrew S. Oldham, Circuit Judge, dissenting» → συμπερίλαβε μικρό όνομα / αρχικά
+            back = NAME_BEFORE.search(text[max(0, start - 50):start])
+            if back:
+                start -= len(back.group(0))
+            hits.append((start, classify(m.group(0), text[m.end():m.end() + 60])))
     hits.sort()
     out, last = [], -10**9
     for pos, ty in hits:
