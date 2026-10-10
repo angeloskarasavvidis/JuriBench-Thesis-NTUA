@@ -2,33 +2,41 @@
 """
 split_opinions.py — Διαχωρισμός γνωμών ανά υπόθεση (αίτημα Κόνιαρη, 2026-10-08)
 -------------------------------------------------------------------------------
-Πριν: το opinion_text είχε ΜΙΑ γνώμη ανά υπόθεση (την «καλύτερη»), συχνά με
-ενωμένα majority + dissent + concurrence (π.χ. Thompson v. Clark τελειώνει με dissent).
+Πριν: το opinion_text είχε ΜΙΑ γνώμη ανά υπόθεση, συχνά με ενωμένα majority +
+dissent + concurrence (π.χ. Thompson v. Clark τελειώνει με dissent).
 
-Μετά (στο juribench_cases.csv αλλάζουν/προστίθενται ΜΟΝΟ αυτά):
+Μετά (στο juribench_cases.csv):
   opinion_text      → μόνο η majority (020lead)
   dissent_text      → όλα τα 040dissent (κενό αν δεν υπάρχουν)
   concurrence_text  → όλα τα 030concurrence (κενό αν δεν υπάρχουν)
-  combined_only     → 1 αν η υπόθεση έχει μόνο 010combined (το κείμενο μένει ως έχει
-                      στο opinion_text), αλλιώς 0
-Πολλαπλές γνώμες ίδιου τύπου ενώνονται με μία κενή γραμμή (σειρά: opinion id).
+  combined_only     → 1 αν η υπόθεση έχει μόνο 010combined, αλλιώς 0
+  split_method      → type        : διαχωρισμός από το πεδίο type του CourtListener
+                      text_regex  : combined κείμενο χωρίστηκε από τις επικεφαλίδες
+                                    («JUSTICE X, dissenting», «Y, Circuit Judge, concurring»)
+                      none        : combined χωρίς αναγνωρίσιμες ξεχωριστές γνώμες (ως έχει)
+Πολλαπλές γνώμες ίδιου τύπου ενώνονται με μία κενή γραμμή (σειρά: opinion id / θέση).
 
-Τύποι CourtListener που ΔΕΝ όρισε ρητά ο καθηγητής (εκκρεμεί επιβεβαίωση, tasks.md A3)
-— default χειρισμός, ρυθμίζεται με flags:
-  025plurality, 015unamimous  → majority αν ΔΕΝ υπάρχει 020lead (--no-majority-fallback για απενεργοποίηση)
-  035concurrenceinpart        → concurrence_text (--concur-in-part dissent|concurrence|ignore)
-  050addendum, 060remittitur, 070rehearing, 080onthemerits, 090onmotiontostrike, …
-                              → αγνοούνται (μετριούνται στην αναφορά)
+Τύποι που δεν όρισε ρητά ο καθηγητής (tasks.md A3) — default, ρυθμίζεται με flags:
+  025plurality, 015unamimous → majority μόνο αν λείπει 020lead (--no-majority-fallback)
+  035concurrenceinpart       → concurrence_text (--concur-in-part concurrence|dissent|ignore)
+  υπόλοιποι (addendum, rehearing, …) → αγνοούνται (μετρώνται στην αναφορά)
 
-Διαβάζει ΜΟΝΟ τα opinions των cluster_ids του dataset (streaming, όπως το bulk_filter).
-Γράφει in-place με αυτόματο backup (<όνομα>.pre_split.csv) + αναφορά markdown.
+ΠΡΟΝΟΙΑ: στο πρώτο τρέξιμο αποθηκεύει ΟΛΕΣ τις γνώμες των υποθέσεών μας στο
+data/opinions_by_type.jsonl.gz. Κάθε επόμενο τρέξιμο (άλλες επιλογές) γίνεται με
+--from-dump σε λίγα λεπτά, ΧΩΡΙΣ νέο streaming των 50GB. Το input διαβάζεται πάντα από
+το backup (<όνομα>.pre_split.csv), ώστε τα επαναληπτικά τρεξίματα να είναι ισοδύναμα.
 
 Usage:
+  # 1ο τρέξιμο (streaming, ώρες):
   python code/split_opinions.py --opinions /data/mkoniaris/akar/bulk/opinions-2026-06-30.csv.bz2
-  python code/split_opinions.py --opinions ... --report data/split_report.md
+  # επόμενα (λεπτά):
+  python code/split_opinions.py --from-dump data/opinions_by_type.jsonl.gz [--concur-in-part dissent] [--no-text-split]
 """
 import argparse
 import csv
+import gzip
+import json
+import re
 import shutil
 import sys
 from collections import Counter, defaultdict
@@ -46,6 +54,21 @@ CONCUR_IN_PART = "035concurrenceinpart"
 DISSENT = "040dissent"
 COMBINED = "010combined"
 COURTS = ["SCOTUS", "CA5", "CA9"]
+
+# Αρχή ξεχωριστής γνώμης μέσα σε combined κείμενο (το κείμενο έχει ενωμένα κενά).
+# SCOTUS: «JUSTICE ALITO, with whom JUSTICE THOMAS joins, dissenting.» (ΟΧΙ «ALITO, J., dissenting»
+#         που είναι κεφαλίδα σελίδας / παραπομπή).
+# Circuits: «JONES, Circuit Judge, dissenting:»
+SEP_PATTERNS = [
+    re.compile(r"(?:(?i:chief)\s+)?(?i:justice)\s+[A-Z][A-Za-z'\-]+"
+               r"(?:\s*,\s*with\s+whom\s+[^.:;]{0,250}?\s+joins?(?:\s+[^,.]{0,120}?)?)?"
+               r"\s*,\s*(concurring|dissenting)\b"),
+    re.compile(r"\b[A-Z][A-Za-z'\-]+\s*,\s*(?:Chief\s+|Senior\s+)?(?:Circuit|District)\s+Judge\s*,\s*"
+               r"(?:with\s+whom\s+[^.:;]{0,200}?\s+joins?\s*,\s*)?(concurring|dissenting)\b"),
+]
+MIN_MAJ_FRAC = 0.15     # η 1η ξεχωριστή γνώμη πρέπει να ξεκινά μετά το 15% του κειμένου
+MIN_MAJ_WORDS = 300     # και η majority να έχει ≥300 λέξεις
+MIN_GAP = 300           # αγνόησε matches πιο κοντά από 300 χαρακτήρες στο προηγούμενο
 
 
 def best_text(row):
@@ -73,110 +96,188 @@ def words(t):
     return len((t or "").split())
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--opinions", required=True, help="opinions-*.csv.bz2 (bulk)")
-    ap.add_argument("--input", default=None)
-    ap.add_argument("--output", default=None)
-    ap.add_argument("--report", default=None, help="markdown αναφορά (default: data/split_report.md)")
-    ap.add_argument("--no-majority-fallback", action="store_true",
-                    help="μην χρησιμοποιείς plurality/unanimous ως majority όταν λείπει το 020lead")
-    ap.add_argument("--concur-in-part", choices=["concurrence", "dissent", "ignore"],
-                    default="concurrence")
-    args = ap.parse_args()
+def classify(m_text, tail):
+    s = (m_text + " " + tail).lower()
+    if "concurring in part" in s and "dissenting in part" in s:
+        return CONCUR_IN_PART
+    return DISSENT if "dissenting" in m_text.lower() else CONCUR
 
-    root = Path(__file__).parent.parent
-    inp = Path(args.input) if args.input else root / "data" / "juribench_cases.csv"
-    out = Path(args.output) if args.output else inp
-    report = Path(args.report) if args.report else root / "data" / "split_report.md"
 
-    with open(inp, encoding="utf-8") as f:
-        rows = list(csv.DictReader(f))
-    fieldnames = list(rows[0].keys())
-    for c in ("dissent_text", "concurrence_text", "combined_only"):
-        if c not in fieldnames:
-            fieldnames.append(c)
-    want = {str(r.get("cluster_id")) for r in rows}
-    print(f"Input : {inp} | υποθέσεις: {len(rows)}")
+def find_separate_opinions(text):
+    """Επιστρέφει [(start, type)] για τις αρχές ξεχωριστών γνωμών μέσα σε κείμενο."""
+    hits = []
+    for pat in SEP_PATTERNS:
+        for m in pat.finditer(text):
+            hits.append((m.start(), classify(m.group(0), text[m.end():m.end() + 60])))
+    hits.sort()
+    out, last = [], -10**9
+    for pos, ty in hits:
+        if pos - last >= MIN_GAP:
+            out.append((pos, ty)); last = pos
+    return out
 
-    # ── streaming: όλες οι γνώμες των clusters μας ──
-    ops = defaultdict(lambda: defaultdict(list))   # cid -> type -> [(id, text)]
+
+def text_split(text):
+    """Combined κείμενο → (majority, [(pos, type, text)]) ή None αν δεν είναι ασφαλές."""
+    seps = [s for s in find_separate_opinions(text) if s[0] >= MIN_MAJ_FRAC * len(text)]
+    if not seps or words(text[:seps[0][0]]) < MIN_MAJ_WORDS:
+        return None
+    maj = text[:seps[0][0]].strip()
+    parts = []
+    for i, (pos, ty) in enumerate(seps):
+        end = seps[i + 1][0] if i + 1 < len(seps) else len(text)
+        parts.append((pos, ty, text[pos:end].strip()))
+    return maj, parts
+
+
+# ── φόρτωση γνωμών ──────────────────────────────────────────────────────────
+def load_stream(path, want, dump_path):
+    ops = defaultdict(lambda: defaultdict(list))
     n = 0
-    print(f"Streaming opinions: {args.opinions}")
-    with opener(args.opinions) as f:
+    print(f"Streaming opinions: {path}")
+    with opener(path) as f:
         for row in reader(f):
             n += 1
             if n % 1_000_000 == 0:
                 print(f"   ...{n:,} opinions, clusters με γνώμες: {len(ops)}")
             cid = (row.get("cluster_id") or "").strip()
             if cid in want:
-                ops[cid][(row.get("type") or "").strip() or "(κενό)"].append(
-                    (oid(row.get("id")), best_text(row)))
-    print(f"   clusters που βρέθηκαν: {len(ops)}/{len(want)}")
+                ty = (row.get("type") or "").strip() or "(κενό)"
+                ops[cid][ty].append((oid(row.get("id")), best_text(row),
+                                     (row.get("author_str") or "").strip()))
+    dump_path.parent.mkdir(parents=True, exist_ok=True)
+    with gzip.open(dump_path, "wt", encoding="utf-8") as g:
+        for cid, by_t in ops.items():
+            g.write(json.dumps({"cluster_id": cid, "opinions": [
+                {"id": i, "type": ty, "author_str": a, "text": t}
+                for ty, items in by_t.items() for i, t, a in items]}, ensure_ascii=False) + "\n")
+    print(f"   Dump → {dump_path} (επόμενα τρεξίματα: --from-dump, χωρίς streaming)")
+    return ops
 
-    # ── ανάθεση ──
+
+def load_dump(path, want):
+    ops = defaultdict(lambda: defaultdict(list))
+    with gzip.open(path, "rt", encoding="utf-8") as g:
+        for line in g:
+            d = json.loads(line)
+            if d["cluster_id"] in want:
+                for o in d["opinions"]:
+                    ops[d["cluster_id"]][o["type"]].append((o["id"], o["text"], o.get("author_str", "")))
+    print(f"Από dump: {path}")
+    return ops
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    src = ap.add_mutually_exclusive_group(required=True)
+    src.add_argument("--opinions", help="opinions-*.csv.bz2 (bulk) — 1ο τρέξιμο, γράφει dump")
+    src.add_argument("--from-dump", help="data/opinions_by_type.jsonl.gz — γρήγορα επαναληπτικά τρεξίματα")
+    ap.add_argument("--dump", default=None, help="πού γράφεται το dump (default: data/opinions_by_type.jsonl.gz)")
+    ap.add_argument("--input", default=None)
+    ap.add_argument("--output", default=None)
+    ap.add_argument("--report", default=None)
+    ap.add_argument("--no-majority-fallback", action="store_true")
+    ap.add_argument("--concur-in-part", choices=["concurrence", "dissent", "ignore"], default="concurrence")
+    ap.add_argument("--no-text-split", action="store_true",
+                    help="μην χωρίζεις τα 010combined από το κείμενο (μένουν ως έχουν)")
+    args = ap.parse_args()
+
+    root = Path(__file__).parent.parent
+    data = root / "data"
+    target = Path(args.input) if args.input else data / "juribench_cases.csv"
+    out = Path(args.output) if args.output else target
+    report = Path(args.report) if args.report else data / "split_report.md"
+    dump = Path(args.dump) if args.dump else data / "opinions_by_type.jsonl.gz"
+
+    # Πάντα από το ΠΡΙΝ-τον-διαχωρισμό αρχείο → επαναλήψιμο
+    bak = target.with_name(target.stem + ".pre_split.csv")
+    if not bak.exists():
+        shutil.copy2(target, bak)
+        print(f"Backup → {bak}")
+    with open(bak, encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    fieldnames = list(rows[0].keys())
+    for c in ("dissent_text", "concurrence_text", "combined_only", "split_method"):
+        if c not in fieldnames:
+            fieldnames.append(c)
+    want = {str(r.get("cluster_id")) for r in rows}
+    print(f"Input : {bak} | υποθέσεις: {len(rows)}")
+
+    raw = load_stream(args.opinions, want, dump) if args.opinions else load_dump(args.from_dump, want)
+    ops = {cid: {ty: [(i, t) for i, t, _ in items] for ty, items in by_t.items()} for cid, by_t in raw.items()}
+    print(f"   clusters με γνώμες: {len(ops)}/{len(want)}")
+
     maj_types = [LEAD] + ([] if args.no_majority_fallback else MAJ_FALLBACK)
+    handled = set(maj_types) | {DISSENT, CONCUR, CONCUR_IN_PART, COMBINED}
     type_count = {c: Counter() for c in COURTS}
-    ignored = Counter()
-    stats = Counter()
+    ignored, stats = Counter(), Counter()
+    method = {c: Counter() for c in COURTS}
     w_before, w_after = [], []
+
+    def route(dis, con, ty, item):
+        if ty == DISSENT:
+            dis.append(item)
+        elif ty == CONCUR:
+            con.append(item)
+        elif ty == CONCUR_IN_PART:
+            if args.concur_in_part == "concurrence":
+                con.append(item)
+            elif args.concur_in_part == "dissent":
+                dis.append(item)
+
     for r in rows:
         jur = r.get("jurisdiction", "")
-        t = ops.get(str(r.get("cluster_id")))
         old = r.get("opinion_text", "")
+        t = ops.get(str(r.get("cluster_id")))
         if not t:
+            r.update(dissent_text="", concurrence_text="", combined_only="", split_method="none")
             stats["χωρίς γνώμες στο bulk (κράτησα το παλιό κείμενο)"] += 1
-            r.setdefault("dissent_text", ""); r.setdefault("concurrence_text", "")
-            r["combined_only"] = ""
             continue
         for ty, items in t.items():
             if jur in type_count:
                 type_count[jur][ty] += len(items)
+            if ty not in handled:
+                ignored[ty] += len(items)
+
+        dis, con = [], []
+        for ty in (DISSENT, CONCUR, CONCUR_IN_PART):
+            for item in t.get(ty, []):
+                route(dis, con, ty, item)
 
         maj = next((ty for ty in maj_types if t.get(ty)), None)
-        dis = list(t.get(DISSENT, []))
-        con = list(t.get(CONCUR, []))
-        if t.get(CONCUR_IN_PART):
-            if args.concur_in_part == "concurrence":
-                con += t[CONCUR_IN_PART]
-            elif args.concur_in_part == "dissent":
-                dis += t[CONCUR_IN_PART]
-
         if maj:
-            new_text, combined = join(t[maj]), "0"
+            new_text, combined, how = join(t[maj]), "0", "type"
             if maj != LEAD:
                 stats[f"majority από {maj} (δεν υπήρχε 020lead)"] += 1
             if len(t[maj]) > 1:
                 stats["πολλαπλές majority γνώμες (ενώθηκαν)"] += 1
-            if t.get(COMBINED):
-                stats["είχε και 010combined (αγνοήθηκε, υπάρχει majority)"] += 1
+            if find_separate_opinions(new_text) and text_split(new_text):
+                stats["⚠ majority (type) που μοιάζει να περιέχει ξεχωριστή γνώμη — έλεγχος"] += 1
         elif t.get(COMBINED):
-            new_text, combined = join(t[COMBINED]), "1"
+            comb = join(t[COMBINED])
+            combined = "1"
+            sp = None if args.no_text_split else text_split(comb)
+            if sp:
+                new_text, parts = sp
+                for pos, ty, txt in parts:
+                    route(dis, con, ty, (pos, txt))
+                how = "text_regex"
+            else:
+                new_text, how = comb, "none"
         else:
-            new_text, combined = old, ""
+            new_text, combined, how = old, "", "none"
             stats["χωρίς majority/combined (κράτησα το παλιό κείμενο)"] += 1
 
-        handled = set(maj_types) | {DISSENT, CONCUR, CONCUR_IN_PART, COMBINED}
-        for ty, items in t.items():
-            if ty not in handled:
-                ignored[ty] += len(items)
-
         w_before.append(words(old)); w_after.append(words(new_text))
-        r["opinion_text"] = new_text
-        r["dissent_text"] = join(dis)
-        r["concurrence_text"] = join(con)
-        r["combined_only"] = combined
-        stats["combined_only=1"] += combined == "1"
+        r.update(opinion_text=new_text, dissent_text=join(dis), concurrence_text=join(con),
+                 combined_only=combined, split_method=how)
+        if jur in method:
+            method[jur][how if combined != "1" else f"combined→{how}"] += 1
         stats["με dissent"] += bool(r["dissent_text"])
         stats["με concurrence"] += bool(r["concurrence_text"])
-        stats["opinion_text < 200 λέξεις μετά τον διαχωρισμό"] += 0 < words(new_text) < 200
+        stats["combined_only=1"] += combined == "1"
+        stats["opinion_text < 200 λέξεις"] += 0 < words(new_text) < 200
 
-    # ── backup + write ──
-    if out == inp:
-        bak = inp.with_name(inp.stem + ".pre_split.csv")
-        if not bak.exists():
-            shutil.copy2(inp, bak)
-            print(f"Backup → {bak}")
     with open(out, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fieldnames)
         w.writeheader()
@@ -188,40 +289,25 @@ def main():
     # ── αναφορά ──
     med = lambda xs: sorted(xs)[len(xs) // 2] if xs else 0
     L = [f"# Αναφορά διαχωρισμού γνωμών — `{out.name}`", "",
-         f"**Υποθέσεις:** {len(rows)} · βρέθηκαν στο bulk: {len(ops)}", "",
-         "## Αποτέλεσμα", "", "| Μέτρηση | Πλήθος |", "|---|---|"]
-    for k in ["με dissent", "με concurrence", "combined_only=1"]:
-        L.append(f"| {k} | {stats[k]} |")
-    for k, v in stats.items():
-        if k not in ("με dissent", "με concurrence", "combined_only=1"):
-            L.append(f"| {k} | {v} |")
+         f"**Υποθέσεις:** {len(rows)} · με γνώμες στο bulk: {len(ops)} · "
+         f"text-split: {'ΟΧΙ' if args.no_text_split else 'ΝΑΙ'} · concur-in-part → {args.concur_in_part}", "",
+         "## Μέθοδος ανά δικαστήριο", "", "| Μέθοδος | " + " | ".join(COURTS) + " |",
+         "|---|" + "---|" * len(COURTS)]
+    for mth in sorted(set().union(*[set(m) for m in method.values()])):
+        L.append(f"| {mth} | " + " | ".join(str(method[c][mth]) for c in COURTS) + " |")
+    L += ["", "## Αποτέλεσμα", "", "| Μέτρηση | Πλήθος |", "|---|---|"]
+    L += [f"| {k} | {v} |" for k, v in stats.items()]
     L += ["", f"**Median λέξεις opinion_text:** πριν {med(w_before)} → μετά {med(w_after)}", "",
           "## Τύποι γνωμών ανά δικαστήριο (πλήθος γνωμών)", "",
-          "| Τύπος | " + " | ".join(COURTS) + " | Χειρισμός |", "|---|" + "---|" * (len(COURTS) + 1)]
-    all_types = sorted(set().union(*[set(c) for c in type_count.values()]))
-    for ty in all_types:
-        if ty == LEAD:
-            how = "opinion_text"
-        elif ty in MAJ_FALLBACK:
-            how = "opinion_text αν λείπει 020lead" if not args.no_majority_fallback else "αγνοείται"
-        elif ty == CONCUR:
-            how = "concurrence_text"
-        elif ty == CONCUR_IN_PART:
-            how = {"concurrence": "concurrence_text", "dissent": "dissent_text", "ignore": "αγνοείται"}[args.concur_in_part]
-        elif ty == DISSENT:
-            how = "dissent_text"
-        elif ty == COMBINED:
-            how = "opinion_text + combined_only=1 (μόνο αν δεν υπάρχει majority)"
-        else:
-            how = "αγνοείται"
-        L.append(f"| `{ty}` | " + " | ".join(str(type_count[c][ty]) for c in COURTS) + f" | {how} |")
+          "| Τύπος | " + " | ".join(COURTS) + " |", "|---|" + "---|" * len(COURTS)]
+    for ty in sorted(set().union(*[set(c) for c in type_count.values()])):
+        L.append(f"| `{ty}` | " + " | ".join(str(type_count[c][ty]) for c in COURTS) + " |")
     if ignored:
         L += ["", "**Αγνοήθηκαν:** " + ", ".join(f"`{k}` {v}" for k, v in ignored.most_common())]
     text = "\n".join(L)
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(text + "\n", encoding="utf-8")
-    print("\n" + text)
-    print(f"\nSaved -> {out}\nReport -> {report}")
+    print("\n" + text + f"\n\nSaved -> {out}\nReport -> {report}")
 
 
 if __name__ == "__main__":
