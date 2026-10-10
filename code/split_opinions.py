@@ -63,8 +63,11 @@ SEP_PATTERNS = [
     re.compile(r"(?:(?i:chief)\s+)?(?i:justice)\s+[A-Z][A-Za-z'\-]+"
                r"(?:\s*,\s*with\s+whom\s+[^.:;]{0,250}?\s+joins?(?:\s+[^,.]{0,120}?)?)?"
                r"\s*,\s*(concurring|dissenting)\b"),
-    re.compile(r"\b[A-Z][A-Za-z'\-]+\s*,\s*(?:Chief\s+|Senior\s+)?(?:Circuit|District)\s+Judge\s*,\s*"
-               r"(?:with\s+whom\s+[^.:;]{0,200}?\s+joins?\s*,\s*)?(concurring|dissenting)\b"),
+    # «JONES, Circuit Judge, dissenting:» · «RICHMAN, Chief Judge, dissenting» ·
+    # «ELROD, Circuit Judge, joined by SMITH, …, Circuit Judges, dissenting:» · «…, with whom … join, …»
+    re.compile(r"\b[A-Z][A-Za-z'\-]+\s*,\s*(?:(?:Chief|Senior|Circuit|District)\s+){1,2}Judges?\s*,\s*"
+               r"(?:(?:with\s+whom\s+[^:;]{0,400}?\s+joins?|joined\s+by\s+[^:;]{0,400}?)\s*,\s*)?"
+               r"(concurring|dissenting)\b"),
 ]
 MIN_MAJ_FRAC = 0.15     # η 1η ξεχωριστή γνώμη πρέπει να ξεκινά μετά το 15% του κειμένου
 MIN_MAJ_WORDS = 300     # και η majority να έχει ≥300 λέξεις
