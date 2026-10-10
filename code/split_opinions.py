@@ -65,13 +65,34 @@ SEP_PATTERNS = [
                r"\s*,\s*(concurring|dissenting)\b"),
     # «JONES, Circuit Judge, dissenting:» · «RICHMAN, Chief Judge, dissenting» ·
     # «ELROD, Circuit Judge, joined by SMITH, …, Circuit Judges, dissenting:» · «…, with whom … join, …»
-    re.compile(r"\b[A-Z][A-Za-z'\-]+\s*,\s*(?:(?:Chief|Senior|Circuit|District)\s+){1,2}Judges?\s*,\s*"
+    # + καταλήξεις/αρχικά μετά το επώνυμο: «GRAVES, JR., Circuit Judge», «NELSON, R., Circuit Judge»
+    # + σκέτο «Judge» (by designation): «BAKER, Judge, concurring in part»
+    re.compile(r"\b[A-Z][A-Za-z'\-]+(?:\s*,\s*(?:Jr|JR|Sr|SR|III|II|IV|[A-Z])\.?)?\s*,\s*"
+               r"(?:(?:Chief|Senior|Circuit|District)\s+){0,2}Judges?\s*,\s*"
                r"(?:(?:with\s+whom\s+[^:;]{0,400}?\s+joins?|joined\s+by\s+[^:;]{0,400}?)\s*,\s*)?"
                r"(concurring|dissenting)\b"),
 ]
 # 1–3 tokens ονόματος/αρχικών ακριβώς πριν το επώνυμο (π.χ. «Andrew S. », «Rhesa Hawkins »)·
 # ΟΧΙ λέξεις όλο κεφαλαία (AFFIRMED) ούτε το «JUSTICE»
-NAME_BEFORE = re.compile(r"(?:(?<![A-Za-z])(?:[A-Z][a-z]+|[A-Z]\.)\s+){1,3}$")
+NAME_BEFORE = re.compile(r"(?:(?<![A-Za-z])(?:[A-Z][A-Za-z]+|[A-Z]\.)\s+){1,3}$")
+# λέξεις που ΔΕΝ είναι ονόματα, αν τύχει να βρίσκονται ακριβώς πριν την επικεφαλίδα
+NOT_NAMES = {"AFFIRMED", "AFFIRM", "REVERSED", "REVERSE", "VACATED", "VACATE", "REMANDED",
+             "DENIED", "DISMISSED", "GRANTED", "ORDERED", "CLERK", "APPEALS", "COURT", "OPINION",
+             "JUSTICE", "JUDGE", "PER", "CURIAM", "THE", "AND", "OF", "No"}
+
+
+def name_prefix_len(before):
+    """Μήκος του ονόματος/αρχικών ακριβώς πριν το επώνυμο (πετά λέξεις του NOT_NAMES)."""
+    m = NAME_BEFORE.search(before)
+    if not m:
+        return 0
+    toks = m.group(0).split()
+    while toks and toks[0].rstrip(".") in NOT_NAMES:
+        toks.pop(0)
+    if not toks:
+        return 0
+    i = before.rfind(toks[0], m.start())
+    return len(before) - i
 MIN_MAJ_FRAC = 0.15    # η 1η ξεχωριστή γνώμη πρέπει να ξεκινά μετά το 15% του κειμένου
 MIN_MAJ_WORDS = 300     # και η majority να έχει ≥300 λέξεις
 MIN_GAP = 300           # αγνόησε matches πιο κοντά από 300 χαρακτήρες στο προηγούμενο
@@ -115,10 +136,12 @@ def find_separate_opinions(text):
     for pat in SEP_PATTERNS:
         for m in pat.finditer(text):
             start = m.start()
+            # παραπομπή μέσα σε παρένθεση «(Jones, Judge, dissenting)» → ΟΧΙ αρχή γνώμης
+            lo = max(0, start - 120)
+            if text.rfind("(", lo, start) > text.rfind(")", lo, start):
+                continue
             # «Andrew S. Oldham, Circuit Judge, dissenting» → συμπερίλαβε μικρό όνομα / αρχικά
-            back = NAME_BEFORE.search(text[max(0, start - 50):start])
-            if back:
-                start -= len(back.group(0))
+            start -= name_prefix_len(text[max(0, start - 50):start])
             hits.append((start, classify(m.group(0), text[m.end():m.end() + 60])))
     hits.sort()
     out, last = [], -10**9
