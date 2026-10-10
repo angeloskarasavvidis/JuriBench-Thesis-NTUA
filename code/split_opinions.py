@@ -70,7 +70,7 @@ SEP_PATTERNS = [
     # + σκέτο «Judge» (by designation): «BAKER, Judge, concurring in part»
     re.compile(r"\b[A-Z][A-Za-z'\-]+(?:\s*,\s*(?:Jr|JR|Sr|SR|III|II|IV|[A-Z](?:\.[A-Z])*)\.?)?\s*,\s*"
                r"(?:(?:Chief|Senior|Circuit|District)\s+){0,2}Judges?\s*,\s*"
-               r"(?:(?:with\s+whom\s+[^:;]{0,400}?\s+joins?|joined\s+by\s+[^:;]{0,400}?)\s*,\s*)?" + KW),
+               r"(?:(?:with\s+whom|joined\s+by)\s+[^:;]{0,400}?\s*,\s*)?" + KW),
 ]
 # 1–3 tokens ονόματος/αρχικών ακριβώς πριν το επώνυμο (π.χ. «Andrew S. », «Rhesa Hawkins »)·
 # ΟΧΙ λέξεις όλο κεφαλαία (AFFIRMED) ούτε το «JUSTICE»
