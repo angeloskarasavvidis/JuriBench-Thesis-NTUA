@@ -51,6 +51,15 @@ def norm(s):
     return re.sub(r"[^a-z]", "", s.lower())
 
 
+def last_keys(last):
+    """Κλειδιά επωνύμου: «O'Scannlain» → {'oscannlain','scannlain'} (το byline regex χάνει το «O'»)."""
+    keys = {norm(last)}
+    m = re.match(r"^\s*([OD])['’]\s*(.+)$", last or "", flags=re.I)
+    if m:
+        keys.add(norm(m.group(2)))
+    return keys
+
+
 def first_token(s):
     for t in re.split(r"[\s,]+", s or ""):
         if t and norm(t) not in ("jr", "sr", "ii", "iii", "iv") and len(norm(t)) > 1:
@@ -101,6 +110,7 @@ def load_fjc():
                         raw = (r.get(f"Party of Appointing President ({k})") or "").strip()
                         out[c].append({
                             "last": norm(r.get("Last Name")),
+                            "keys": last_keys(r.get("Last Name")),
                             "first": first_token(r.get("First Name")),
                             "start": parse_date(r.get(f"Commission Date ({k})")),
                             "end": parse_date(r.get(f"Termination Date ({k})")),
@@ -122,18 +132,21 @@ def load_jcs():
                 circ, score = int(float(r.get("circuit"))), float(r.get("jcs"))
             except (TypeError, ValueError):
                 continue
-            idx[(circ, norm(last))].append((first_token(rest), score, name))
+            for k in last_keys(last):
+                idx[(circ, k)].append((first_token(rest), score, name))
     return idx
 
 
 def identify(cands, d):
-    """Μοναδικός υποψήφιος εν ενεργεία στη d· αλλιώς μοναδικός γενικά· αλλιώς None/'ambiguous'."""
+    """→ (judge | None | 'ambiguous', λίστα υποψηφίων). Μοναδικός εν ενεργεία στη d·
+    αλλιώς μοναδικός γενικά."""
     if not cands:
-        return None
+        return None, []
     active = [c for c in cands if d and c["start"] and c["start"] <= d and (c["end"] is None or d <= c["end"])]
     pool = active if active else cands
     uniq = {(c["last"], c["first"]): c for c in pool}
-    return list(uniq.values())[0] if len(uniq) == 1 else "ambiguous"
+    vals = list(uniq.values())
+    return (vals[0] if len(vals) == 1 else "ambiguous"), vals
 
 
 def pearson(xs, ys):
@@ -170,6 +183,7 @@ def main():
 
     st = {k: Counter() for k in CIRCUIT_OF}
     miss_names, amb_names, other_party = Counter(), Counter(), Counter()
+    amb_cands, party_judges = {}, Counter()
     cmp_x, cmp_y, sign_agree, sign_n = [], [], 0, 0
     for r in rows:
         r["ideology_fallback"] = r["ideology_fallback_source"] = ""
@@ -181,14 +195,22 @@ def main():
         a = norm(r.get("author_str"))
         if not a:
             s["χωρίς author_str"] += 1; continue
-        judge = identify([c for c in fjc[circ] if c["last"] == a], parse_date(r.get("date_filed")))
+        judge, cands = identify([c for c in fjc[circ] if a in c["keys"]], parse_date(r.get("date_filed")))
         if judge == "ambiguous":
-            s["αμφίσημο (≥2 δικαστές ίδιο επώνυμο)"] += 1; amb_names[f"{jur} {r.get('author_str')}"] += 1; continue
+            s["αμφίσημο (≥2 δικαστές ίδιο επώνυμο)"] += 1
+            key = f"{jur} {norm(r.get('author_str'))}"
+            amb_names[key] += 1
+            amb_cands[key] = sorted({c["name"] for c in cands})
+            continue
         jc = jcs.get((circ, a), [])
         hit = None
         if judge:
             hits = [x for x in jc if x[0] and judge["first"] and (x[0][:3] == judge["first"][:3])]
-            hit = hits[0] if len(hits) == 1 else None
+            if len(hits) == 1:
+                hit = hits[0]
+            elif not hits and len(jc) == 1:
+                # μοναδικός με αυτό το επώνυμο στο circuit στο JCS (π.χ. FJC «Stuart Kyle» vs JCS «Kyle»)
+                hit = jc[0]
         elif len(jc) == 1:
             hit = jc[0]
         if hit:
@@ -203,6 +225,7 @@ def main():
         elif judge and judge["party"]:
             r["ideology_fallback"], r["ideology_fallback_source"] = judge["party"], "party"
             s["party"] += 1
+            party_judges[f"{jur} {judge['name']} ({judge['party']})"] += 1
         elif judge:
             s["δικαστής στο FJC, κόμμα όχι R/D"] += 1; other_party[judge["raw_party"] or "(κενό)"] += 1
         else:
@@ -231,8 +254,12 @@ def main():
           f"- Ζεύγη: {len(cmp_x)} · Pearson r = {r_:.3f}" if r_ is not None else f"- Ζεύγη: {len(cmp_x)}",
           f"- Συμφωνία πρόσημου (φιλελεύθερος/συντηρητικός): {sign_agree}/{sign_n}"
           + (f" ({sign_agree / sign_n:.1%})" if sign_n else "")]
+    if party_judges:
+        L += ["", "## Δικαστές που πήραν κόμμα (δεν βρέθηκαν στο JCS) — top 25", ""] + \
+             [f"- {k}: {v}" for k, v in party_judges.most_common(25)]
     if amb_names:
-        L += ["", "## Αμφίσημα (top 15)", ""] + [f"- {k}: {v}" for k, v in amb_names.most_common(15)]
+        L += ["", "## Αμφίσημα (top 15) — με τους υποψηφίους του FJC", ""] + \
+             [f"- {k}: {v} · υποψήφιοι: {', '.join(amb_cands.get(k, []))}" for k, v in amb_names.most_common(15)]
     if miss_names:
         L += ["", "## Δεν βρέθηκαν στο CA5/CA9 roster (top 20)", ""] + [f"- {k}: {v}" for k, v in miss_names.most_common(20)]
     if other_party:
