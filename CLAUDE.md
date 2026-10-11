@@ -8,7 +8,15 @@
 
 ## ▶ ΞΕΚΙΝΑ ΑΠΟ ΕΔΩ — κατάσταση στις 2026-10-10
 
-**Τρέχει τώρα στο labrat** (tmux session `split`): το **αυστηρό** ξαναχτίσιμο του διαχωρισμού γνωμών
+**✅ ΟΛΟΚΛΗΡΩΘΗΚΕ (2026-10-10 17:25)** — το labrat έκανε επανεκκίνηση στις 2026-10-11 (τα tmux sessions χάθηκαν,
+τα αρχεία είναι εντάξει). Αποτέλεσμα: combined_only=1 9.158 · dissent 366 · concurrence 254 · αγνοήθηκαν
+035concurrenceinpart 120, 070rehearing 3 · dump `data/opinions_by_type.jsonl.gz` (136MB).
+**✅ Βήμα 2 (SCDB) ΟΛΟΚΛΗΡΩΘΗΚΕ (2026-10-11):** scdb_id 701/720 (docket 698), issue_area 699, ideology 657·
+19 χωρίς match = μη επί της ουσίας (Q3)· 1 διαφωνία με CL scdb_id (μικρό, να εξεταστεί).
+**✅ Βήμα 3 (completeness_report, 2026-10-11):** A 10.394 · B 10.071 · C 569 (SCOTUS 79%) · **D ~7.717 (74,2%)**.
+SCOTUS ιδεολογία λείπει σε 63 (21 χωρίς SCDB · 42 με SCDB αλλά χωρίς Martin-Quinn — να εξεταστεί γιατί).
+**Επόμενο: βήμα 4 (A7).**
+Ιστορικό — έτρεξε στο labrat (tmux session `split`) το **αυστηρό** ξαναχτίσιμο του διαχωρισμού γνωμών
 ```
 python code/split_opinions.py --opinions /data/mkoniaris/akar/bulk/opinions-2026-06-30.csv.bz2
 ```
