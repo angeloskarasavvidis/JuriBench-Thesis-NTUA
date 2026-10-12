@@ -2,47 +2,39 @@
 
 Πλήρες context ώστε μια νέα session (Claude Code ή άλλη) να συνεχίσει σωστά. Διάβασέ το ολόκληρο,
 **μαζί με το `tasks.md`**, πριν απαντήσεις. Ενημέρωνε και τα δύο όταν κάτι αλλάζει.
-Τελευταία ενημέρωση: **2026-10-10** (μεταφορά από Cowork σε Claude Code).
+Τελευταία ενημέρωση: **2026-10-12** (απάντηση καθηγητή — ξαναχτίσιμο).
 
 ---
 
-## ▶ ΞΕΚΙΝΑ ΑΠΟ ΕΔΩ — κατάσταση στις 2026-10-10
+## ▶ ΞΕΚΙΝΑ ΑΠΟ ΕΔΩ — κατάσταση στις 2026-10-12
 
-**✅ ΟΛΟΚΛΗΡΩΘΗΚΕ (2026-10-10 17:25)** — το labrat έκανε επανεκκίνηση στις 2026-10-11 (τα tmux sessions χάθηκαν,
-τα αρχεία είναι εντάξει). Αποτέλεσμα: combined_only=1 9.158 · dissent 366 · concurrence 254 · αγνοήθηκαν
-035concurrenceinpart 120, 070rehearing 3 · dump `data/opinions_by_type.jsonl.gz` (136MB).
-**✅ Βήμα 2 (SCDB) ΟΛΟΚΛΗΡΩΘΗΚΕ (2026-10-11):** scdb_id 701/720 (docket 698), issue_area 699, ideology 657·
-19 χωρίς match = μη επί της ουσίας (Q3)· 1 διαφωνία με CL scdb_id (μικρό, να εξεταστεί).
-**✅ Βήμα 3 (completeness_report, 2026-10-11):** A 10.394 · B 10.071 · C 569 (SCOTUS 79%) · **D ~7.717 (74,2%)**.
-SCOTUS ιδεολογία λείπει σε 63 (21 χωρίς SCDB · 42 με SCDB αλλά χωρίς Martin-Quinn — να εξεταστεί γιατί).
-**Επόμενο: βήμα 4 (A7).**
-Ιστορικό — έτρεξε στο labrat (tmux session `split`) το **αυστηρό** ξαναχτίσιμο του διαχωρισμού γνωμών
-```
-python code/split_opinions.py --opinions /data/mkoniaris/akar/bulk/opinions-2026-06-30.csv.bz2
-```
-- Διαβάζει από το αρχικό backup `data/juribench_cases.pre_split.csv` (πριν από κάθε διαχωρισμό).
-- Streaming ~10,5εκ. opinions → μερικές ώρες. Γράφει **στο τέλος** το `data/juribench_cases.csv`, την αναφορά
-  `data/split_report.md` και το dump `data/opinions_by_type.jsonl.gz` (όλες οι γνώμες των υποθέσεών μας ανά τύπο).
-- **ΜΗΝ αγγίξεις το `data/juribench_cases.csv` στο labrat όσο τρέχει.** Έλεγχος: `tmux attach -t split`
-  (έξοδος χωρίς διακοπή: Ctrl+b, d).
+**Απάντηση καθηγητή (2026-10-12) → εγκεκριμένο ξαναχτίσιμο (χωρίς 50GB, χωρίς LLM):**
+`parse_author.py` (δικό του) · διαχωρισμός με επικεφαλίδες (`split_method` cl_separate/heading/none) ·
+`opinion_kind` (merits/summary_order/memorandum/per_curiam, ΚΑΜΙΑ αφαίρεση) · by designation → `party_fjc` +
+`author_visiting=1` · ταυτίσεις Richman=Owen, Forrest=Hunsaker, Ramirez=Carrillo Ramirez (`judge_aliases.py`,
+κοινό για JuDJIS/JCS/FJC) · αφαίρεση κεφαλίδων PDF (`clean_headers.py`).
+**Κώδικας: ✅ έτοιμος & δοκιμασμένος σε συνθετικά δεδομένα (2026-10-12).** Εκκρεμεί: τρέξιμο στο labrat.
+Οι ερωτήσεις που δεν στάλθηκαν (disposition, 035/070, εξαρτώμενα SCDB) **αγνοούνται προς το παρόν**.
 
-**Μόλις τελειώσει (με αυτή τη σειρά):**
-1. Έλεγχος αναφοράς: `text-split: ΟΧΙ · concur-in-part → ignore`, `combined_only=1` ≈ 9.158, με dissent ≈ 366,
-   με concurrence ≈ 230–350, Αγνοήθηκαν: `035concurrenceinpart`, `070rehearing`.
-2. SCDB (λεπτά):
-   ```
-   B=/data/mkoniaris/akar/bulk; D=2026-06-30
-   python code/enrich_scdb.py --clusters $B/opinion-clusters-$D.csv.bz2 --dockets $B/dockets-$D.csv.bz2 \
-          --citations $B/citations-$D.csv.bz2      # το --citations μόνο αν έχει κατέβει το αρχείο
-   ```
-   Αναμενόμενο: scdb_id ~700/720 (πριν το en dash fix ήταν 691). Οι ~16 που θα μείνουν «χωρίς match» είναι
-   επείγουσες αιτήσεις / cert denials, που το SCDB σκόπιμα δεν περιέχει.
-3. `python code/completeness_report.py --md data/completeness_report.md`
-4. **A7 — ideology fallback** (το μόνο αίτημα του καθηγητή που δεν έχει ξεκινήσει· βλ. tasks.md A7).
-   Πρώτο βήμα: εύρεση πηγών (JCS scores circuit judges + κόμμα Προέδρου που διόρισε, π.χ. FJC Biographical
-   Directory) και έλεγχος κάλυψης για Collins, VanDyke, Bumatay, Bress, Lee κ.ά. **Δεν αλλάζουν** τα
-   `ideology` / `ideology_score`.
-5. Email στον καθηγητή με το ανανεωμένο dataset (A8) + τις ερωτήσεις **Q1–Q6** (tasks.md §Q).
+**Σειρά στο labrat** (`cd /data/mkoniaris/akar/JuriBench && git pull`, env ενεργό):
+```
+python code/split_opinions.py --from-dump data/opinions_by_type.jsonl.gz --text-split   # από .pre_split.csv
+python code/clean_headers.py
+python code/enrich_authors.py --input data/juribench_cases.csv --output data/juribench_cases.csv
+python code/opinion_kind.py
+python code/enrich_ideology.py --input data/juribench_cases.csv --output data/juribench_cases.csv
+B=/data/mkoniaris/akar/bulk; D=2026-06-30
+python code/enrich_scdb.py --clusters $B/opinion-clusters-$D.csv.bz2 --dockets $B/dockets-$D.csv.bz2 --citations $B/citations-$D.csv.bz2
+python code/ideology_fallback.py
+python code/check_authors.py
+python code/completeness_report.py --md data/completeness_report.md
+```
+Προσοχή: `clean_headers` / `opinion_kind` / `ideology_fallback` κρατούν backup (.pre_clean / .pre_kind /
+.pre_fallback) **μόνο αν δεν υπάρχει ήδη** → σε 2ο τρέξιμο το backup είναι το παλιό.
+Μετά: αριθμοί → tasks.md, σύντομο email στον καθηγητή, splits/finetune data (C7).
+
+Ιστορικό (2026-10-10/11): αυστηρός διαχωρισμός από 50GB (combined_only=1 9.158) · SCDB 701/720 ·
+completeness D ~74% · fallback 8.311/9.675 · εύρημα A10 (λάθος author_str ~41–46%) → λύθηκε με `parse_author.py`.
 
 ---
 

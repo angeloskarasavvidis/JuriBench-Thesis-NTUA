@@ -30,6 +30,9 @@ from pathlib import Path
 
 import jellyfish  # Jaro-Winkler
 
+sys.path.insert(0, str(Path(__file__).parent))
+from judge_aliases import surname_variants, norm as alias_norm  # noqa: E402
+
 csv.field_size_limit(sys.maxsize)
 
 ROOT = Path(__file__).parent.parent
@@ -149,10 +152,12 @@ def circuit_key(s):
     return m.group(1) if m else ""
 
 
-def match_judjis(author_str, judjis_roster, court_name):
+def match_judjis(author_str, judjis_roster, court_name, jurisdiction=""):
     if not author_str:
         return None
     ck = circuit_key(court_name)
+    # κοινός πίνακας ταυτίσεων (Richman=Owen, Forrest=Hunsaker, Ramirez=Carrillo Ramirez)
+    aliases = surname_variants(author_str, jurisdiction) - {alias_norm(author_str)}
     best, best_score = None, 0.0
     for j in judjis_roster:
         jk = circuit_key(j["court"])
@@ -164,6 +169,9 @@ def match_judjis(author_str, judjis_roster, court_name):
         s = jellyfish.jaro_winkler_similarity(author_str.lower(), j["full_name"].lower())
         s2 = jellyfish.jaro_winkler_similarity(author_str.lower(), j["last_name"].lower())
         s = max(s, s2)
+        for a in aliases:
+            s = max(s, jellyfish.jaro_winkler_similarity(a, alias_norm(j["last_name"])),
+                    jellyfish.jaro_winkler_similarity(a, alias_norm(j["full_name"])))
         if s > best_score:
             best_score, best = s, j
     if best and best_score >= JW_THRESHOLD:
@@ -214,11 +222,13 @@ def enrich_circuits(rows, judjis_roster):
     for row in rows:
         if row.get("jurisdiction") not in ("CA5", "CA9"):
             continue
+        # καθάρισε τις παλιές τιμές: αλλιώς μένουν τιμές του προηγούμενου (λάθος) συγγραφέα
+        row["ideology"] = row["ideology_score"] = row["ideology_source"] = ""
         author_str = (row.get("author_str") or "").strip()
         if not author_str:
             no_author_str += 1
             continue
-        hit = match_judjis(author_str, judjis_roster, row.get("court", ""))
+        hit = match_judjis(author_str, judjis_roster, row.get("court", ""), row.get("jurisdiction", ""))
         if not hit:
             unmatched += 1
             continue

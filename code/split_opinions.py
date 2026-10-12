@@ -308,7 +308,8 @@ def main():
     dump = Path(args.dump) if args.dump else data / "opinions_by_type.jsonl.gz"
 
     if args.from_csv:
-        return run_from_csv(target, out, report)
+        raise SystemExit("Το --from-csv καταργήθηκε (παλιές τιμές split_method). Χρησιμοποίησε:\n"
+                         "  python code/split_opinions.py --from-dump data/opinions_by_type.jsonl.gz --text-split")
 
     # Πάντα από το ΠΡΙΝ-τον-διαχωρισμό αρχείο → επαναλήψιμο
     bak = target.with_name(target.stem + ".pre_split.csv")
@@ -370,32 +371,35 @@ def main():
                 route(dis, con, ty, item)
 
         maj = next((ty for ty in maj_types if t.get(ty)), None)
+        # split_method (οδηγία καθηγητή 2026-10-12): cl_separate / heading / none
+        #   cl_separate → χωρισμένο ήδη στο CourtListener (020lead κ.λπ.)      combined_only = 0
+        #   heading     → 010combined χωρισμένο από τις επικεφαλίδες           combined_only = 0
+        #   none        → 010combined που ΔΕΝ χωρίστηκε με ασφάλεια (ενιαίο)   combined_only = 1
         if maj:
-            new_text, combined, how = join(t[maj]), "0", "type"
+            new_text, combined, how, key = join(t[maj]), "0", "cl_separate", "cl_separate"
             if maj != LEAD:
                 stats[f"majority από {maj} (δεν υπήρχε 020lead)"] += 1
             if len(t[maj]) > 1:
                 stats["πολλαπλές majority γνώμες (ενώθηκαν)"] += 1
         elif t.get(COMBINED):
             comb = join(t[COMBINED])
-            combined = "1"
             sp = None if args.no_text_split else text_split(comb)
             if sp:
                 new_text, parts = sp
                 for pos, ty, txt in parts:
                     route(dis, con, ty, (pos, txt))
-                how = "text_regex"
+                combined, how, key = "0", "heading", "heading"
             else:
-                new_text, how = comb, "none"
+                new_text, combined, how, key = comb, "1", "none", "none (ενιαίο, combined_only=1)"
         else:
-            new_text, combined, how = old, "", "none"
+            new_text, combined, how, key = old, "", "none", "none (χωρίς majority/combined)"
             stats["χωρίς majority/combined (κράτησα το παλιό κείμενο)"] += 1
 
         w_before.append(words(old)); w_after.append(words(new_text))
         r.update(opinion_text=new_text, dissent_text=join(dis), concurrence_text=join(con),
                  combined_only=combined, split_method=how)
         if jur in method:
-            method[jur][how if combined != "1" else f"combined→{how}"] += 1
+            method[jur][key] += 1
         stats["με dissent"] += bool(r["dissent_text"])
         stats["με concurrence"] += bool(r["concurrence_text"])
         stats["combined_only=1"] += combined == "1"
