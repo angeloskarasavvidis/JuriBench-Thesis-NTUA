@@ -184,7 +184,7 @@ def main():
 
     model    = os.environ.get("LLM_MODEL", "openai/gpt-4o-mini")
     base_url = os.environ.get("LLM_BASE_URL", "https://openrouter.ai/api/v1")
-    api_key  = os.environ.get("LLM_API_KEY", "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")
+    api_key  = os.environ.get("LLM_API_KEY", "")   # ΜΟΝΟ από .env — ποτέ hardcoded κλειδί
     if not api_key:
         raise SystemExit("Set LLM_API_KEY in .env (see .env.example).")
 
