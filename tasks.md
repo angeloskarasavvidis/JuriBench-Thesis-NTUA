@@ -29,13 +29,13 @@
 
 | # | Task | Ημ/νία | Κατάσταση | Σημειώσεις |
 |---|---|---|---|---|
-| A11 | `parse_author.py` (του καθηγητή) στο `enrich_authors.py` + στήλη `author_source` (signature/opinion_by/none) | 2026-10-12 | 🔄 κώδικας ✅ | Αναμένει ~70+ άγνωστους που δεν είναι per curiam/memorandum. Λύνει το A10. |
-| A12 | Διαχωρισμός combined με επικεφαλίδες: `split_method` cl_separate/heading/none · `combined_only=0` όταν πετυχαίνει | 2026-10-12 | 🔄 κώδικας ✅ | `split_opinions.py --from-dump … --text-split`. Λύνει το A2/Q1. |
-| A13 | `opinion_kind` = merits/summary_order/memorandum/per_curiam — καμία αφαίρεση | 2026-10-12 | 🔄 κώδικας ✅ | `code/opinion_kind.py` + `data/opinion_kind_report.md`. |
-| A14 | By designation → κόμμα Προέδρου από FJC (όλα τα δικαστήρια), `ideology_fallback_source = party_fjc`, `author_visiting = 1` (ακόμη κι αν είναι στο JCS) | 2026-10-12 | 🔄 κώδικας ✅ | `ideology_fallback.py`. Λύνει το Q7. |
-| A15 | Πίνακας ταυτίσεων Richman=Owen, Forrest=Hunsaker, Ramirez=Carrillo Ramirez για JuDJIS/JCS/FJC | 2026-10-12 | 🔄 κώδικας ✅ | `code/judge_aliases.py` (ανά circuit). |
-| A16 | Αφαίρεση κεφαλίδων PDF (CA5 ECF, CA9 «2 SHELTRA V. CHRISTENSEN») απ' όλες τις στήλες κειμένου, μόνο όπου είναι ασφαλές | 2026-10-12 | 🔄 κώδικας ✅ | `code/clean_headers.py` + `data/clean_headers_report.md`. |
-| A17 | Τρέξιμο αλυσίδας στο labrat (σειρά στο CLAUDE.md) → αριθμοί → σύντομο email | 2026-10-12 | ⏳ | Ερωτήσεις που δεν στάλθηκαν (disposition, 035/070, εξαρτώμενα SCDB): αγνοούνται προς το παρόν. |
+| A11 | `parse_author.py` (του καθηγητή) στο `enrich_authors.py` + στήλη `author_source` (signature/opinion_by/none) | 2026-10-12 | ✅ 2026-10-12 | Σωστό 99,9% (CA5) / 99,2% (CA9) (πριν 59/54%). Χωρίς συγγραφέα 1.191. Merits χωρίς συγγραφέα **389** (αναμενόταν ~70+): ORDER 234 · καμία ένδειξη 79 · PER CURIAM μετά τους 4.000 χαρ. 53 · υπογραφή που δεν πιάστηκε 16 · «Opinion by» που δεν πιάστηκε 7 (`diag_unknown_authors.py`) → ερώτηση στον καθηγητή. |
+| A12 | Διαχωρισμός combined με επικεφαλίδες: `split_method` cl_separate/heading/none · `combined_only=0` όταν πετυχαίνει | 2026-10-12 | ✅ 2026-10-12 | cl_separate 1.234 · heading 1.934 · combined_only=1 7.224 · με dissent 1.517 · με concurrence 1.048. |
+| A13 | `opinion_kind` = merits/summary_order/memorandum/per_curiam — καμία αφαίρεση | 2026-10-12 | ✅ 2026-10-12 | merits 9.528 · summary_order 45 · memorandum 112 · per_curiam 710. |
+| A14 | By designation → κόμμα Προέδρου από FJC (όλα τα δικαστήρια), `ideology_fallback_source = party_fjc`, `author_visiting = 1` (ακόμη κι αν είναι στο JCS) | 2026-10-12 | ✅ 2026-10-12 | Fallback 7.969/9.675 (JCS 7.523 · party_fjc 446)· r=0,784 με JuDJIS· αμφίσημα 410 (Smith 299, Nelson 84, Thomas 27)· by designation αμφίσημα 85· δεν βρέθηκαν 20 (OCR/σκουπίδια στο author_str). |
+| A15 | Πίνακας ταυτίσεων Richman=Owen, Forrest=Hunsaker, Ramirez=Carrillo Ramirez για JuDJIS/JCS/FJC | 2026-10-12 | ✅ 2026-10-12 | `code/judge_aliases.py` (ανά circuit). JuDJIS 7.465. |
+| A16 | Αφαίρεση κεφαλίδων PDF (CA5 ECF, CA9 «2 SHELTRA V. CHRISTENSEN») απ' όλες τις στήλες κειμένου, μόνο όπου είναι ασφαλές | 2026-10-12 | ✅ 2026-10-12 | CA5 42.599 κεφαλίδες ECF · CA9 74.121 captions · ~5,5εκ. χαρακτήρες. |
+| A17 | Τρέξιμο αλυσίδας στο labrat (σειρά στο CLAUDE.md) → αριθμοί → σύντομο email | 2026-10-12 | 🔄 έτρεξε, email εκκρεμεί | Completeness D 7.853 (75,5%). Ερωτήσεις που δεν στάλθηκαν (disposition, 035/070, εξαρτώμενα SCDB): αγνοούνται προς το παρόν. |
 
 ## Q. Ερωτήσεις προς τον καθηγητή (ΔΕΝ υλοποιούνται πριν απαντήσει)
 
