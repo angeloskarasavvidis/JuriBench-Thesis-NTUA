@@ -165,7 +165,9 @@ def identify_own(cands, d, ini=""):
     allv = list(uniq.values())
     vals = by_initials(allv, ini)
     if not vals:
-        return "ambiguous", allv
+        # τα αρχικά δεν ταιριάζουν με ΚΑΝΕΝΑΝ δικαστή του circuit (π.χ. D.D. Pregerson ≠ Harry Pregerson)
+        # → δεν είναι δικαστής του circuit· ψάξε ως by designation
+        return "conflict", allv
     return (vals[0] if len(vals) == 1 else "ambiguous"), vals
 
 
@@ -177,7 +179,7 @@ def identify_visiting(cands, d, ini=""):
     allv = list(persons.values())
     vals = by_initials(allv, ini)
     if not vals:
-        return "ambiguous", allv
+        return None, allv
     return (vals[0] if len(vals) == 1 else "ambiguous"), vals
 
 
@@ -240,7 +242,12 @@ def main():
             s["αμφίσημο στο ίδιο circuit"] += 1
             key = f"{jur} {a}" + (f" [{ini}]" if ini else ""); amb[key] += 1; amb_c[key] = sorted({c["name"] for c in cands})
             continue
-        jc = [x for v in variants for x in jcs.get((circ, v), [])]
+        if judge == "conflict":
+            s["αρχικά ≠ δικαστών του circuit → αναζήτηση ως by designation"] += 1
+            judge = None
+            jc = []          # ΟΧΙ JCS με βάση μόνο το επώνυμο (θα ήταν ο λάθος δικαστής)
+        else:
+            jc = [x for v in variants for x in jcs.get((circ, v), [])]
         jc = list({x[2]: x for x in jc}.values())
         hit = None
         if judge:
@@ -297,7 +304,8 @@ def main():
 
     keys = ["υποθέσεις", "jcs", "party", "party_fjc (by designation)", "χωρίς author_str",
             "αμφίσημο στο ίδιο circuit", "by designation — αμφίσημο", "δεν βρέθηκε στο FJC",
-            "ίδιο circuit, κόμμα όχι R/D", "by designation, κόμμα όχι R/D"]
+            "ίδιο circuit, κόμμα όχι R/D", "by designation, κόμμα όχι R/D",
+            "αρχικά ≠ δικαστών του circuit → αναζήτηση ως by designation"]
     L = [f"# Ideology fallback — `{out.name}`", "", "| | CA5 | CA9 | Σύνολο |", "|---|---|---|---|"]
     for k in keys:
         L.append(f"| {k} | {st['CA5'][k]} | {st['CA9'][k]} | {st['CA5'][k] + st['CA9'][k]} |")

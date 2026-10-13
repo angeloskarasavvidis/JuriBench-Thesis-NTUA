@@ -38,8 +38,9 @@ CA5_HDR = re.compile(
 # 2026-10-13: άλλες μορφές ECF (παραρτήματα / επισυναπτόμενα έγγραφα) — πολύ συγκεκριμένες, άρα ασφαλείς
 OTHER_ECF = [
     # CA9: «Case: 20-35411, 11/13/2020, ID: 11893224, DktEntry: 20-2, Page 186 of 305»
-    re.compile(r"Case:\s*\d{2}-\d{3,6},\s*\d{1,2}/\d{1,2}/\d{4},\s*ID:\s*\d+,\s*DktEntry:\s*[\d.\-]+,\s*"
-               r"Page\s*\d+\s*of\s*\d+"),
+    #      και χωρίς κόμματα: «Case: 09-99012 10/15/2014 ID: 9278330 DktEntry: 115-2 Page: 171 of 315»
+    re.compile(r"Case:\s*\d{2}-\d{3,6},?\s*\d{1,2}/\d{1,2}/\d{4},?\s*ID:\s*\d+,?\s*DktEntry:\s*[\d.\-]+,?\s*"
+               r"Page:?\s*\d+\s*of\s*\d+"),
     # BAP / άλλα: «Case: 20-1025, Document: 19, Filed: 10/05/2020 Page 1 of 16»
     re.compile(r"Case:\s*\d{2}-\d{3,6},\s*Document:\s*[\d\-]+,\s*Filed:\s*\d{1,2}/\d{1,2}/\d{4}\s*"
                r"Page\s*\d+\s*of\s*\d+"),

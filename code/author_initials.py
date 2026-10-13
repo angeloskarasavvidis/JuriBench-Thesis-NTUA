@@ -23,7 +23,7 @@ STOP = {"opinion", "order", "memorandum", "per", "curiam", "summary", "judge", "
         "amended", "filed", "before", "with", "of", "for", "en", "banc", "panel", "justice", "hon"} | NOT_NAMES
 SUFFIX = {"jr", "sr", "ii", "iii", "iv"}
 INITIAL = re.compile(r"^(?:[A-Z]\.){1,3}$")
-WORD = re.compile(r"^[A-Z][A-Za-z'’\-]+$")
+WORD = re.compile(r"^[A-Z][A-Za-z'’\-]*[A-Za-z]$")   # όχι «O’» / «D'» (μέρος επωνύμου: O’SCANNLAIN)
 
 
 def _fmt(letters):

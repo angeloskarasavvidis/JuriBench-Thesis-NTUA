@@ -226,7 +226,8 @@ def match_judjis(author_str, judjis_roster, court_name, jurisdiction="", initial
         if len(compat) != 1:
             if stats is not None:
                 stats["συνωνυμία στο FJC → κενό" + (" (ασύμβατα/πολλά αρχικά)" if initials else " (χωρίς αρχικά)")] += 1
-                stats["  " + jurisdiction + " " + alias_norm(author_str) + (f" [{initials}]" if initials else "")] += 1
+                stats["  " + jurisdiction + " " + alias_norm(author_str) + (f" [{initials}]" if initials else "")
+                      + " · FJC: " + " / ".join(sorted(p["name"].split()[0] + " " + p["ini"] for p in people))] += 1
             return None
         target = compat[0]["ini"]
         keep = [j for j in cands if initials_ok(target, initials_of_name(j["first_name"]))]
@@ -239,7 +240,10 @@ def match_judjis(author_str, judjis_roster, court_name, jurisdiction="", initial
             stats["  " + jurisdiction + " " + alias_norm(author_str) + f" [{initials}] = {compat[0]['name'].strip()}"] += 1
         return None
     if len(cands) == 1:
-        if initials and initials_conflict(initials, initials_of_name(cands[0]["first_name"])):
+        # αρχικά υποψηφίου: από το FJC (μικρό + μεσαίο) όταν υπάρχει ένας· αλλιώς μόνο το μικρό του JuDJIS
+        # (π.χ. «E. Grady Jolly»: JuDJIS «E.» αλλά FJC «E.G.» → το «G.» δεν είναι σύγκρουση)
+        cand_ini = people[0]["ini"] if len(people) == 1 else initials_of_name(cands[0]["first_name"])
+        if initials and initials_conflict(initials, cand_ini):
             if stats is not None:
                 stats["μοναδικός υποψήφιος με ασύμβατα αρχικά → κενό"] += 1
                 stats["  " + jurisdiction + " " + alias_norm(author_str) + f" [{initials}] ≠ {cands[0]['full_name']}"] += 1
@@ -329,6 +333,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input",  default=None)
     parser.add_argument("--output", default=None)
+    parser.add_argument("--circuits-only", action="store_true",
+                        help="μόνο CA5/CA9 — δεν αγγίζει τα SCOTUS (τα έχει ήδη γεμίσει το enrich_scdb.py)")
     args = parser.parse_args()
 
     input_path  = Path(args.input)  if args.input  else DATA / "juribench_dataset.csv"
@@ -352,7 +358,10 @@ def main():
     judjis_roster = load_judjis()
     print(f"SCDB rows: loaded | MQ entries: {len(mq_idx)} | JuDJIS judges: {len(judjis_roster)}\n")
 
-    enrich_scotus(rows, scdb_by_cite, scdb_by_name_date, mq_idx)
+    if args.circuits_only:
+        print("SCOTUS: ανέγγιχτο (--circuits-only)")
+    else:
+        enrich_scotus(rows, scdb_by_cite, scdb_by_name_date, mq_idx)
     dates = sorted(tuple(int(x) for x in d.split("-")[:3]) for d in (r.get("date_filed") or "" for r in rows
                    if r.get("jurisdiction") in ("CA5", "CA9")) if re.match(r"\d{4}-\d{2}-\d{2}", d))
     period = (dates[0], dates[-1]) if dates else (None, None)

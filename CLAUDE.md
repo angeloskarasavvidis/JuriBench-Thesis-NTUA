@@ -19,6 +19,9 @@
 1η απάντηση (2026-10-12): parse_author · διαχωρισμός με επικεφαλίδες · opinion_kind · party_fjc · aliases ·
 κεφαλίδες PDF — ✅ έτρεξαν (αποτελέσματα στο tasks.md A11–A17).
 
+**Σημείωση (2026-10-14):** το `enrich_ideology.py` χωρίς σημαία ξαναγράφει ΚΑΙ τα SCOTUS (όνομα+έτος, χειρότερο)
+→ ή τρέχεις μετά `enrich_scdb.py` (~25′), ή `enrich_ideology.py --circuits-only` (δεν αγγίζει SCOTUS).
+
 **Σειρά στο labrat** (`cd /data/mkoniaris/akar/JuriBench && git pull`, env ενεργό):
 ```
 # (ο διαχωρισμός ΔΕΝ ξανατρέχει στον 2ο γύρο)  python code/split_opinions.py --from-dump data/opinions_by_type.jsonl.gz --text-split
