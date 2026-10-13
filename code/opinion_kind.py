@@ -2,7 +2,7 @@
 """
 opinion_kind.py — Είδος απόφασης (οδηγία καθηγητή, 2026-10-12)
 --------------------------------------------------------------
-Νέα στήλη `opinion_kind` ∈ {merits, summary_order, memorandum, per_curiam}. ΚΑΜΙΑ υπόθεση
+Νέα στήλη `opinion_kind` ∈ {merits, summary_order, memorandum, per_curiam, order}. ΚΑΜΙΑ υπόθεση
 δεν αφαιρείται — η εξαίρεση γίνεται στα πειράματα. Κανόνες (σειρά προτεραιότητας):
 
   memorandum    : circuits — «MEMORANDUM» στην αρχή (CA9 memorandum dispositions).
@@ -12,6 +12,9 @@ opinion_kind.py — Είδος απόφασης (οδηγία καθηγητή, 
                   (< 1.500 λέξεις· αλλιώς είναι amended opinion επί της ουσίας).
   per_curiam    : «PER CURIAM» στην αρχή — circuits: και χωρίς υπογεγραμμένο συγγραφέα
                   (author_source = none)· SCOTUS: και χωρίς «delivered the opinion of the Court».
+  order         : (2026-10-13) circuits — χωρίς υπογεγραμμένο συγγραφέα (author_source = none) και
+                  «ORDER» στην αρχή (πρώτοι 3.000 χαρ.) ΠΡΙΝ από κάθε «OPINION»· όχι «ORDER AND
+                  (AMENDED) OPINION» (ίδιος κανόνας με το diag_unknown_authors — οι 234).
   merits        : όλα τα υπόλοιπα.
 
 Αναφορά (data/opinion_kind_report.md): πλήθη ανά δικαστήριο, δείγματα ανά κατηγορία και οι
@@ -29,7 +32,7 @@ from pathlib import Path
 
 csv.field_size_limit(sys.maxsize)
 
-KINDS = ["merits", "summary_order", "memorandum", "per_curiam"]
+KINDS = ["merits", "summary_order", "memorandum", "per_curiam", "order"]
 MEMO = re.compile(r"\bMEMORANDUM\b")
 CERT = r"(?:the\s+)?(?:petition\s+for\s+)?(?:a\s+)?(?:writ\s+of\s+)?certiorari"
 SCOTUS_SUMMARY = re.compile(
@@ -45,6 +48,8 @@ EN_BANC_DENIAL = re.compile(
     r"respecting\s+(?:the\s+)?denial\s+of\s+(?:the\s+petition\s+for\s+)?rehearing\s+en\s+banc", re.I)
 PER_CURIAM = re.compile(r"\bPER\s+CURIAM\b", re.I)
 DELIVERED = re.compile(r"delivered\s+the\s+opinion\s+of\s+the\s+Court", re.I)
+ORDER_HEAD = re.compile(r"\bORDER\b(?!\s+(?:AND\s+)?(?:AMENDED\s+)?OPINION)")
+OPINION_HEAD = re.compile(r"\bOPINION\b")
 SHORT_WORDS = 1500
 
 
@@ -62,6 +67,11 @@ def classify(r):
             return "summary_order"
         if (r.get("author_source") or "") == "none" and PER_CURIAM.search(h):
             return "per_curiam"
+        if (r.get("author_source") or "") == "none":
+            h3 = head(txt, 3000)
+            o, p = ORDER_HEAD.search(h3), OPINION_HEAD.search(h3)
+            if o and (not p or o.start() < p.start()):
+                return "order"
         return "merits"
     if jur == "SCOTUS":
         if SCOTUS_SUMMARY.search(h):

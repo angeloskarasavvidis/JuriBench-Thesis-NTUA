@@ -41,13 +41,13 @@
 
 | # | Task | Ποιος | Κατάσταση | Σημειώσεις |
 |---|---|---|---|---|
-| R2-0 | Διάγνωση (μόνο ανάγνωση): πόσοι Smith/Nelson/Thomas/visiting έχουν αρχικά στην υπογραφή ή πλήρες όνομα στο «Before:» · δείγματα ECF που έμειναν στο CA5 · στήλες JuDJIS/FJC | εγώ γράφω → εσύ τρέχεις | ⏳ | Για να ξέρουμε τι θα πετύχουμε πριν αλλάξουμε κώδικα. |
-| R2-1 | Νέα στήλη `author_initials` (υπογραφή / «Opinion by», αλλιώς γραμμή «Before:» αν μοναδικό επώνυμο) | εγώ | ⏳ | Το `parse_author` του καθηγητή δεν αλλάζει. |
-| R2-2 | Match με (αρχικά, επώνυμο) σε JuDJIS (`enrich_ideology`) και FJC (`ideology_fallback`, και για visiting π.χ. Friedman). Αμφίσημο → κενό | εγώ | ⏳ | Κάποιες υποθέσεις χάνουν το (λάθος) JuDJIS score. |
-| R2-3 | Aliases OCR: IKLUTA/IEUTA→IKUTA, MeKEOWN→McKEOWN, GRAJBER→GRABER, MURGIA→MURGUIA, REAYLEY→REAVLEY | εγώ | ⏳ | Στο `judge_aliases.py`, μόνο στην αντιστοίχιση· το `author_str` μένει ως έχει. |
-| R2-4 | `opinion_kind = order` για τις 234 merits χωρίς συγγραφέα που ξεκινούν με ORDER | εγώ | ⏳ | |
-| R2-5 | `clean_headers`: υπόλοιπες κεφαλίδες ECF CA5 («Page:1» κ.λπ.) | εγώ | ⏳ | Με βάση τα δείγματα του R2-0. |
-| R2-6 | Συνθετικά tests → push → τρέξιμο στο labrat → έλεγχος αριθμών → email + dataset | εγώ + εσύ | ⏳ | Στόχοι: Nelson ~79/24, Smith ~245/58, Thomas ~57/11, order 234, ECF υπόλοιπα 0. |
+| R2-0 | Διάγνωση (μόνο ανάγνωση): πόσοι Smith/Nelson/Thomas/visiting έχουν αρχικά στην υπογραφή ή πλήρες όνομα στο «Before:» · δείγματα ECF που έμειναν στο CA5 · στήλες JuDJIS/FJC | εγώ γράφω → εσύ τρέχεις | ✅ 2026-10-13 | Smith: αρχικά στην υπογραφή 297/299 (M. 244 · N.R. 53). Nelson: R. 35 + «D.» 44 (= Ryan D. Nelson, τελευταίος της «Before» → το «Judges» πρέπει να αποκλειστεί) + D.W. 23. Thomas: 67/107 (S.R./Sidney R. ~53, H.A./«A.» ~11), 40 χωρίς (π.χ. «THOMAS, Chief Judge:»). Visiting: πλήρες όνομα συχνά μόνο στην υποσημείωση «The Honorable … sitting by designation». ECF υπόλοιπα: CA5 «RESTRICTED», CA9 μορφή «Case: N, date, ID: N, DktEntry: N, Page X of Y» σε παραρτήματα· SCOTUS 12 με σελίδα σύγκρισης εγγράφων («Differences exist between documents») → ερώτηση. |
+| R2-1 | Νέα στήλη `author_initials` (υπογραφή / «Opinion by», αλλιώς γραμμή «Before:» αν μοναδικό επώνυμο) | εγώ | ✅ κώδικας 2026-10-13 (test συνθετικά) | Το `parse_author` του καθηγητή δεν αλλάζει. |
+| R2-2 | Match με (αρχικά, επώνυμο) — συνωνυμία = ≥2 στο JuDJIS **ή** στο FJC (όσοι υπηρέτησαν στην περίοδο του dataset· όχι ανά ημερομηνία υπόθεσης) σε JuDJIS (`enrich_ideology`) και FJC (`ideology_fallback`, και για visiting π.χ. Friedman). Αμφίσημο → κενό | εγώ | ✅ κώδικας 2026-10-13 (test συνθετικά) | Κάποιες υποθέσεις χάνουν το (λάθος) JuDJIS score. |
+| R2-3 | Aliases OCR: IKLUTA/IEUTA→IKUTA, MeKEOWN→McKEOWN, GRAJBER→GRABER, MURGIA→MURGUIA, REAYLEY→REAVLEY | εγώ | ✅ κώδικας 2026-10-13 (test συνθετικά) | Στο `judge_aliases.py`, μόνο στην αντιστοίχιση· το `author_str` μένει ως έχει. |
+| R2-4 | `opinion_kind = order` για τις 234 merits χωρίς συγγραφέα που ξεκινούν με ORDER | εγώ | ✅ κώδικας 2026-10-13 (test συνθετικά) | |
+| R2-5 | `clean_headers`: υπόλοιπες κεφαλίδες ECF CA5 («Page:1» κ.λπ.) | εγώ | ✅ κώδικας 2026-10-13 (test συνθετικά) | Με βάση τα δείγματα του R2-0. |
+| R2-6 | Συνθετικά tests → push → τρέξιμο στο labrat → έλεγχος αριθμών → email + dataset | εγώ + εσύ | 🔄 tests ✅, αναμονή labrat | Στόχοι: Nelson ~79/24, Smith ~245/58, Thomas ~57/11, order 234, ECF υπόλοιπα 0. |
 
 ## Q. Ερωτήσεις προς τον καθηγητή (ΔΕΝ υλοποιούνται πριν απαντήσει)
 

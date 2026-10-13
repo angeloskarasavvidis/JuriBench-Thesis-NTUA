@@ -7,6 +7,8 @@ clean_headers.py — Αφαίρεση κεφαλίδων σελίδας PDF απ
 1. CA5 (και όπου αλλού εμφανίζεται): κεφαλίδα του ECF
      «21 Case: 21-40849 Document: 00516833261 Page: 19 Date Filed: 07/25/2023 No. 21-40849»
    (ο αριθμός σελίδας που προηγείται και το «No. …» / «Cons. w/ No. …» που ακολουθεί).
+   2026-10-13: και «RESTRICTED» / χωρίς κενά («Page:1»), + μορφές ECF παραρτημάτων (CA9
+   «Case: …, ID: …, DktEntry: …, Page X of Y», district «Case 9:19-cv-… Document … Filed … Page X of Y»).
 2. CA9: επαναλαμβανόμενη κεφαλίδα «2 SHELTRA V. CHRISTENSEN» / «UNITED STATES V. WAGGY 15».
    ΑΣΦΑΛΕΙΑ: αφαιρείται μόνο φράση «ΚΕΦΑΛΑΙΑ V. ΚΕΦΑΛΑΙΑ» που (α) είναι όλη με κεφαλαία,
    (β) έχει δίπλα της αριθμό σελίδας και (γ) εμφανίζεται έτσι ≥3 φορές στην ίδια υπόθεση.
@@ -29,9 +31,22 @@ csv.field_size_limit(sys.maxsize)
 TEXT_COLS = ["opinion_text", "dissent_text", "concurrence_text"]
 DOCKET = r"\d{2}-\d{2,6}"
 CA5_HDR = re.compile(
-    r"(?:(?<![\w.,])\d{1,3}\s+)?Case:\s*" + DOCKET + r"\s+Document:\s*[\w\-]+\s+Page:\s*\d+\s+"
-    r"Date\s+Filed:\s*\d{1,2}/\d{1,2}/\d{4}"
+    r"(?:(?<![\w.,])\d{1,3}\s+)?Case:\s*" + DOCKET + r"\s*(?:RESTRICTED\s*)?Document:\s*[\w\-]+\s*Page:\s*\d+\s*"
+    r"Date\s*Filed:\s*\d{1,2}/\d{1,2}/\d{4}"
     r"(?:\s+No\.\s*" + DOCKET + r"(?:\s*,?\s*(?:c/w|Cons\.\s*w/|consolidated\s+with)\s*No\.\s*" + DOCKET + r")*)?")
+
+# 2026-10-13: άλλες μορφές ECF (παραρτήματα / επισυναπτόμενα έγγραφα) — πολύ συγκεκριμένες, άρα ασφαλείς
+OTHER_ECF = [
+    # CA9: «Case: 20-35411, 11/13/2020, ID: 11893224, DktEntry: 20-2, Page 186 of 305»
+    re.compile(r"Case:\s*\d{2}-\d{3,6},\s*\d{1,2}/\d{1,2}/\d{4},\s*ID:\s*\d+,\s*DktEntry:\s*[\d.\-]+,\s*"
+               r"Page\s*\d+\s*of\s*\d+"),
+    # BAP / άλλα: «Case: 20-1025, Document: 19, Filed: 10/05/2020 Page 1 of 16»
+    re.compile(r"Case:\s*\d{2}-\d{3,6},\s*Document:\s*[\d\-]+,\s*Filed:\s*\d{1,2}/\d{1,2}/\d{4}\s*"
+               r"Page\s*\d+\s*of\s*\d+"),
+    # district court: «Case 9:19-cv-00012-DWM Document 32 Filed 05/30/19 Page 3 of 10 (PageID #: 12)»
+    re.compile(r"Case\s+\d:\d{2}-[a-z]{2,3}-\d{3,6}(?:-[A-Z0-9]{1,5})*\s+Document\s+[\d\-]+\s+Filed\s+"
+               r"\d{1,2}/\d{1,2}/\d{2,4}\s+Page\s+\d+\s+of\s+\d+(?:\s*Page\s*ID\s*#?:?\s*\d+)?"),
+]
 
 TOK = r"[A-Z][A-Z0-9.&'’\-]*"                # λέξη ΜΟΝΟ με κεφαλαία
 CAPTION = re.compile(r"(?<![A-Za-z])((?:" + TOK + r"\s+){1,4})V\.\s+((?:" + TOK + r"(?:\s+|$)){1,6})")
@@ -78,6 +93,9 @@ def clean_row(texts, court):
             continue
         new, k = CA5_HDR.subn(" ", t)
         n5 += k
+        for pat in OTHER_ECF:
+            new, k = pat.subn(" ", new)
+            n5 += k
         for v in caps:
             pat = re.compile(r"(?<![\w])\d{1,3}\s+" + ws(v) + r"(?![A-Za-z])|(?<![A-Za-z])" + ws(v) + r"\s+\d{1,3}(?![\d/])")
             for m in list(pat.finditer(new))[:1]:
@@ -120,7 +138,7 @@ def main():
         s = st.setdefault(court, Counter())
         s["υποθέσεις"] += 1
         s["με αλλαγή"] += bool(n5 or n9)
-        s["κεφαλίδες CA5 (ECF)"] += n5
+        s["κεφαλίδες ECF"] += n5
         s["κεφαλίδες CA9 (caption)"] += n9
         s["χαρακτήρες που αφαιρέθηκαν"] += before - sum(len(t) for t in new.values())
         if smp:
@@ -130,7 +148,7 @@ def main():
         w = csv.DictWriter(f, fieldnames=fieldnames)
         w.writeheader(); w.writerows(rows)
 
-    keys = ["υποθέσεις", "με αλλαγή", "κεφαλίδες CA5 (ECF)", "κεφαλίδες CA9 (caption)", "χαρακτήρες που αφαιρέθηκαν"]
+    keys = ["υποθέσεις", "με αλλαγή", "κεφαλίδες ECF", "κεφαλίδες CA9 (caption)", "χαρακτήρες που αφαιρέθηκαν"]
     L = [f"# Αφαίρεση κεφαλίδων σελίδας — `{out.name}`", "", "| | SCOTUS | CA5 | CA9 |", "|---|---|---|---|"]
     L += [f"| {k} | {st['SCOTUS'][k]} | {st['CA5'][k]} | {st['CA9'][k]} |" for k in keys]
     L += ["", "## Δείγματα (κείμενο ΠΡΙΝ την αφαίρεση, γύρω από την κεφαλίδα)", ""]

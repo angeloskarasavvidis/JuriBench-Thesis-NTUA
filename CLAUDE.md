@@ -6,19 +6,22 @@
 
 ---
 
-## ▶ ΞΕΚΙΝΑ ΑΠΟ ΕΔΩ — κατάσταση στις 2026-10-12
+## ▶ ΞΕΚΙΝΑ ΑΠΟ ΕΔΩ — κατάσταση στις 2026-10-13
 
-**Απάντηση καθηγητή (2026-10-12) → εγκεκριμένο ξαναχτίσιμο (χωρίς 50GB, χωρίς LLM):**
-`parse_author.py` (δικό του) · διαχωρισμός με επικεφαλίδες (`split_method` cl_separate/heading/none) ·
-`opinion_kind` (merits/summary_order/memorandum/per_curiam, ΚΑΜΙΑ αφαίρεση) · by designation → `party_fjc` +
-`author_visiting=1` · ταυτίσεις Richman=Owen, Forrest=Hunsaker, Ramirez=Carrillo Ramirez (`judge_aliases.py`,
-κοινό για JuDJIS/JCS/FJC) · αφαίρεση κεφαλίδων PDF (`clean_headers.py`).
-**Κώδικας: ✅ έτοιμος & δοκιμασμένος σε συνθετικά δεδομένα (2026-10-12).** Εκκρεμεί: τρέξιμο στο labrat.
-Οι ερωτήσεις που δεν στάλθηκαν (disposition, 035/070, εξαρτώμενα SCDB) **αγνοούνται προς το παρόν**.
+**2η απάντηση καθηγητή (2026-10-13) — tasks R2-0…R2-6 στο tasks.md (ενότητα A'').** Κώδικας ✅ + test συνθετικά:
+`author_initials.py` (νέο) + στήλη `author_initials` · match (αρχικά, επώνυμο) σε JuDJIS (`enrich_ideology`, με
+έλεγχο συνωνυμίας και από FJC) και FJC (`ideology_fallback`, και visiting) · OCR aliases στο `judge_aliases.py` ·
+`opinion_kind = order` · ECF: RESTRICTED + μορφές παραρτημάτων. **Εκκρεμεί: τρέξιμο στο labrat.**
+**Για το email (ΟΧΙ τώρα):** ~40 Thomas χωρίς αρχικά → θα μπορούσαν να λυθούν με την ημερομηνία (H.A. Thomas
+από 2021) · 12 SCOTUS με σελίδα «Differences exist between documents» (σκουπίδι CL) · μπερδεμένες κεφαλίδες ECF
+επισυναπτόμενων εγγράφων (CA5) δεν σβήνονται.
+
+1η απάντηση (2026-10-12): parse_author · διαχωρισμός με επικεφαλίδες · opinion_kind · party_fjc · aliases ·
+κεφαλίδες PDF — ✅ έτρεξαν (αποτελέσματα στο tasks.md A11–A17).
 
 **Σειρά στο labrat** (`cd /data/mkoniaris/akar/JuriBench && git pull`, env ενεργό):
 ```
-python code/split_opinions.py --from-dump data/opinions_by_type.jsonl.gz --text-split   # από .pre_split.csv
+# (ο διαχωρισμός ΔΕΝ ξανατρέχει στον 2ο γύρο)  python code/split_opinions.py --from-dump data/opinions_by_type.jsonl.gz --text-split
 python code/clean_headers.py
 python code/enrich_authors.py --input data/juribench_cases.csv --output data/juribench_cases.csv
 python code/opinion_kind.py

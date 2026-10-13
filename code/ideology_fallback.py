@@ -14,7 +14,7 @@ ideology_fallback.py — Fallback ιδεολογίας για circuit δικασ
 Directory (`data/fjc/judges.csv`) · κοινός πίνακας ταυτίσεων `judge_aliases.py` (Richman=Owen,
 Forrest=Hunsaker, Ramirez=Carrillo Ramirez — ίδιος με JuDJIS).
 
-Ταυτοποίηση (author_str = επώνυμο από parse_author):
+Ταυτοποίηση (author_str = επώνυμο από parse_author· author_initials για συνωνυμίες, 2026-10-13):
   1. ίδιο circuit (FJC): επώνυμο (+ ταυτίσεις) + διορισμός στο CA5/CA9 + εν ενεργεία στη date_filed
      → JCS (ίδιο μικρό όνομα· ή μοναδικό επώνυμο στο circuit) ή κόμμα. ≥2 υποψήφιοι → κενό.
   2. αν δεν βρέθηκε στο ίδιο circuit: JCS μόνο αν μοναδικό επώνυμο στο circuit.
@@ -35,7 +35,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from judge_aliases import surname_variants  # noqa: E402
+from judge_aliases import surname_variants, initials_of_name, initials_ok, initials_conflict  # noqa: E402
 
 csv.field_size_limit(sys.maxsize)
 
@@ -113,6 +113,7 @@ def load_fjc():
                     "nid": r.get("nid") or f"{r.get('Last Name')}|{r.get('First Name')}",
                     "keys": last_keys(r.get("Last Name")),
                     "first": first_token(r.get("First Name")),
+                    "ini": initials_of_name(r.get("First Name"), r.get("Middle Name")),
                     "start": parse_date(r.get(f"Commission Date ({k})")),
                     "end": parse_date(r.get(f"Termination Date ({k})")),
                     "party": PARTY.get(raw.lower(), ""), "raw_party": raw,
@@ -147,21 +148,36 @@ def active(c, d):
     return d and c["start"] and c["start"] <= d and (c["end"] is None or d <= c["end"])
 
 
-def identify_own(cands, d):
+def by_initials(vals, ini):
+    """≥2 υποψήφιοι → κράτα όσους έχουν συμβατά αρχικά (FJC: μικρό + μεσαίο όνομα)."""
+    if not ini:
+        return vals
+    if len(vals) == 1:
+        return [] if initials_conflict(ini, vals[0]["ini"]) else vals
+    return [c for c in vals if initials_ok(ini, c["ini"])]
+
+
+def identify_own(cands, d, ini=""):
     if not cands:
         return None, []
     pool = [c for c in cands if active(c, d)] or cands
     uniq = {(sorted(c["keys"])[0], c["first"]): c for c in pool}
-    vals = list(uniq.values())
+    allv = list(uniq.values())
+    vals = by_initials(allv, ini)
+    if not vals:
+        return "ambiguous", allv
     return (vals[0] if len(vals) == 1 else "ambiguous"), vals
 
 
-def identify_visiting(cands, d):
+def identify_visiting(cands, d, ini=""):
     pool = [c for c in cands if active(c, d)]
     persons = {c["nid"]: c for c in pool}
     if not persons:
         return None, []
-    vals = list(persons.values())
+    allv = list(persons.values())
+    vals = by_initials(allv, ini)
+    if not vals:
+        return "ambiguous", allv
     return (vals[0] if len(vals) == 1 else "ambiguous"), vals
 
 
@@ -218,10 +234,11 @@ def main():
         d = parse_date(r.get("date_filed"))
 
         # 1. δικαστής του ίδιου circuit
-        judge, cands = identify_own([c for c in own[circ] if c["keys"] & variants], d)
+        ini = r.get("author_initials") or ""
+        judge, cands = identify_own([c for c in own[circ] if c["keys"] & variants], d, ini)
         if judge == "ambiguous":
             s["αμφίσημο στο ίδιο circuit"] += 1
-            key = f"{jur} {a}"; amb[key] += 1; amb_c[key] = sorted({c["name"] for c in cands})
+            key = f"{jur} {a}" + (f" [{ini}]" if ini else ""); amb[key] += 1; amb_c[key] = sorted({c["name"] for c in cands})
             continue
         jc = [x for v in variants for x in jcs.get((circ, v), [])]
         jc = list({x[2]: x for x in jc}.values())
@@ -229,8 +246,16 @@ def main():
         if judge:
             same_first = [x for x in jc if x[0] and judge["first"] and x[0][:3] == judge["first"][:3]]
             hit = same_first[0] if len(same_first) == 1 else (jc[0] if not same_first and len(jc) == 1 else None)
+            if hit is not None and not same_first and initials_conflict(judge["ini"], initials_of_name(hit[2].partition(",")[2])):
+                hit = None   # π.χ. Holly A. Thomas (FJC) ≠ «Thomas, Sidney R.» (JCS) → όχι JCS, πάει σε κόμμα
+            if hit is None and not same_first and len(jc) > 1:   # π.χ. «N. Randy» (JCS) vs «N[orman]» (FJC)
+                ok = [x for x in jc if initials_ok(judge["ini"], initials_of_name(x[2].partition(",")[2]))]
+                hit = ok[0] if len(ok) == 1 else None
         elif len(jc) == 1:
             hit = jc[0]
+        elif len(jc) > 1 and ini:
+            ok = [x for x in jc if initials_ok(ini, initials_of_name(x[2].partition(",")[2]))]
+            hit = ok[0] if len(ok) == 1 else None
         if hit:
             r.update(ideology_fallback=hit[1], ideology_fallback_source="jcs", author_visiting="0")
             s["jcs"] += 1
@@ -249,10 +274,10 @@ def main():
             continue
 
         # 3. by designation — όλα τα δικαστήρια του FJC
-        vjudge, vc = identify_visiting([c for c in every if a in c["keys"]], d)
+        vjudge, vc = identify_visiting([c for c in every if c["keys"] & variants], d, ini)
         if vjudge == "ambiguous":
             s["by designation — αμφίσημο"] += 1
-            key = f"{jur} {a} (visiting)"; amb[key] += 1; amb_c[key] = sorted({f"{c['name']} [{c['court']}]" for c in vc})[:6]
+            key = f"{jur} {a} (visiting)" + (f" [{ini}]" if ini else ""); amb[key] += 1; amb_c[key] = sorted({f"{c['name']} [{c['court']}]" for c in vc})[:6]
         elif vjudge and vjudge["party"]:
             r.update(ideology_fallback=vjudge["party"], ideology_fallback_source="party_fjc", author_visiting="1")
             s["party_fjc (by designation)"] += 1

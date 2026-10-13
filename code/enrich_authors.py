@@ -16,7 +16,9 @@ parsed from opinion_text.
 Ξαναϋπολογίζει ΟΛΕΣ τις circuit γραμμές (όχι μόνο τις κενές). SCOTUS: ανέγγιχτο (η ιδεολογία
 του SCOTUS έρχεται από SCDB majOpinWriter).
 
-Adds/overwrites columns: author_str, author_source, author_cl_id (κενό — δεν υπάρχει People FK).
+Adds/overwrites columns: author_str, author_source, author_initials, author_cl_id (κενό — δεν υπάρχει People FK).
+2026-10-13 (οδηγία καθηγητή): `author_initials` (π.χ. M. / N.R. / R.D.) από την υπογραφή, το «Opinion by»
+ή τη γραμμή «Before:» / «The Honorable … sitting by designation» (`author_initials.py`) — για συνωνυμίες.
 
 Usage:
   python code/enrich_authors.py                       # in-place στο data/juribench_dataset.csv
@@ -31,10 +33,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from parse_author import parse_author  # noqa: E402  (αρχείο του καθηγητή, αμετάβλητο)
+from author_initials import author_initials  # noqa: E402
 
 csv.field_size_limit(sys.maxsize)
 
-NEW_COLS = ["author_str", "author_source", "author_cl_id"]
+NEW_COLS = ["author_str", "author_source", "author_initials", "author_cl_id"]
 CIRCUITS = ("CA5", "CA9")
 
 
@@ -63,13 +66,18 @@ def main():
     print(f"Loaded: {len(rows)} rows")
 
     src = {j: Counter() for j in CIRCUITS}
+    ini_src = {j: Counter() for j in CIRCUITS}
     for row in rows:
         j = row.get("jurisdiction")
         if j not in CIRCUITS:
             continue
         surname, source = parse_author(row.get("opinion_text"))
         row["author_str"], row["author_source"], row["author_cl_id"] = surname, source, ""
+        ini, isrc = author_initials(row.get("opinion_text"), surname, source)
+        row["author_initials"] = ini
         src[j][source] += 1
+        if surname:
+            ini_src[j][isrc or "χωρίς αρχικά"] += 1
 
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fieldnames)
@@ -80,6 +88,7 @@ def main():
     for j in CIRCUITS:
         n = sum(src[j].values())
         print(f"  {j}: {n} rows · " + " · ".join(f"{k} {v}" for k, v in sorted(src[j].items())))
+        print(f"      author_initials: " + " · ".join(f"{k} {v}" for k, v in sorted(ini_src[j].items())))
 
 
 if __name__ == "__main__":
