@@ -106,8 +106,13 @@ def load_judjis():
 
 
 def _fjc_date(s):
-    m = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", (s or "").strip())
-    return (int(m.group(3)), int(m.group(1)), int(m.group(2))) if m else None
+    """FJC: «M/D/YYYY» ή «YYYY-MM-DD» (το labrat αρχείο είναι ISO — 2026-10-14 fix)."""
+    s = (s or "").strip()
+    m = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", s)
+    if m:
+        return (int(m.group(3)), int(m.group(1)), int(m.group(2)))
+    m = re.match(r"(\d{4})-(\d{2})-(\d{2})", s)
+    return (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
 
 
 def load_fjc_people(period):
