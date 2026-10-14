@@ -36,6 +36,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from judge_aliases import surname_variants, initials_of_name, initials_ok, initials_conflict  # noqa: E402
+from author_initials import signed_as_district  # noqa: E402
 
 csv.field_size_limit(sys.maxsize)
 
@@ -160,9 +161,14 @@ def by_initials(vals, ini):
 def identify_own(cands, d, ini=""):
     if not cands:
         return None, []
-    pool = [c for c in cands if active(c, d)] or cands
+    act = [c for c in cands if active(c, d)]
+    pool = act or cands
     uniq = {(sorted(c["keys"])[0], c["first"]): c for c in pool}
     allv = list(uniq.values())
+    if act and len(allv) == 1:
+        # 2026-10-14 (καθηγητής): μόνο ένας εν ενεργεία με αυτό το επώνυμο τη μέρα της απόφασης →
+        # αυτός, ακόμη κι αν τα αρχικά δεν ταιριάζουν (λάθος «O.» Bea, «R.» Wardlaw κ.λπ.)
+        return allv[0], allv
     vals = by_initials(allv, ini)
     if not vals:
         # τα αρχικά δεν ταιριάζουν με ΚΑΝΕΝΑΝ δικαστή του circuit (π.χ. D.D. Pregerson ≠ Harry Pregerson)
@@ -237,13 +243,19 @@ def main():
 
         # 1. δικαστής του ίδιου circuit
         ini = r.get("author_initials") or ""
-        judge, cands = identify_own([c for c in own[circ] if c["keys"] & variants], d, ini)
+        if signed_as_district(r.get("opinion_text"), a_raw):
+            # 2026-10-14 (καθηγητής): υπογραφή «District Judge» → by designation → κατευθείαν FJC
+            s["υπογραφή «District Judge» → κατευθείαν by designation"] += 1
+            judge, cands = "conflict", []
+        else:
+            judge, cands = identify_own([c for c in own[circ] if c["keys"] & variants], d, ini)
         if judge == "ambiguous":
             s["αμφίσημο στο ίδιο circuit"] += 1
             key = f"{jur} {a}" + (f" [{ini}]" if ini else ""); amb[key] += 1; amb_c[key] = sorted({c["name"] for c in cands})
             continue
         if judge == "conflict":
-            s["αρχικά ≠ δικαστών του circuit → αναζήτηση ως by designation"] += 1
+            if cands:
+                s["αρχικά ≠ δικαστών του circuit → αναζήτηση ως by designation"] += 1
             judge = None
             jc = []          # ΟΧΙ JCS με βάση μόνο το επώνυμο (θα ήταν ο λάθος δικαστής)
         else:
@@ -281,7 +293,11 @@ def main():
             continue
 
         # 3. by designation — όλα τα δικαστήρια του FJC
-        vjudge, vc = identify_visiting([c for c in every if c["keys"] & variants], d, ini)
+        district = s_dist = signed_as_district(r.get("opinion_text"), a_raw)
+        pool_v = [c for c in every if c["keys"] & variants]
+        if district:   # «District Judge» → μόνο διορισμοί σε District Court
+            pool_v = [c for c in pool_v if "district court" in c["court"].lower()]
+        vjudge, vc = identify_visiting(pool_v, d, ini)
         if vjudge == "ambiguous":
             s["by designation — αμφίσημο"] += 1
             key = f"{jur} {a} (visiting)" + (f" [{ini}]" if ini else ""); amb[key] += 1; amb_c[key] = sorted({f"{c['name']} [{c['court']}]" for c in vc})[:6]
@@ -305,7 +321,8 @@ def main():
     keys = ["υποθέσεις", "jcs", "party", "party_fjc (by designation)", "χωρίς author_str",
             "αμφίσημο στο ίδιο circuit", "by designation — αμφίσημο", "δεν βρέθηκε στο FJC",
             "ίδιο circuit, κόμμα όχι R/D", "by designation, κόμμα όχι R/D",
-            "αρχικά ≠ δικαστών του circuit → αναζήτηση ως by designation"]
+            "αρχικά ≠ δικαστών του circuit → αναζήτηση ως by designation",
+            "υπογραφή «District Judge» → κατευθείαν by designation"]
     L = [f"# Ideology fallback — `{out.name}`", "", "| | CA5 | CA9 | Σύνολο |", "|---|---|---|---|"]
     for k in keys:
         L.append(f"| {k} | {st['CA5'][k]} | {st['CA9'][k]} | {st['CA5'][k] + st['CA9'][k]} |")

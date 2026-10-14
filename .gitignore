@@ -8,7 +8,8 @@ __pycache__/
 .ipynb_checkpoints/
 
 # Δεδομένα (μεγάλα / τρίτων — παράγονται από το pipeline, δεν μπαίνουν σε git)
-data/
+data/*
+!data/author_overrides.csv
 
 # Artifacts εκπαίδευσης/αξιολόγησης (παράγονται στο Colab)
 adapters/

@@ -129,3 +129,15 @@ def author_initials(text, surname, source):
     if ini:
         return _fmt(ini), "panel"
     return "", ""
+
+
+def signed_as_district(text, surname):
+    """True αν η υπογραφή του συγγραφέα γράφει «District Judge» (οδηγία καθηγητή 2026-10-14: τότε ο
+    δικαστής είναι by designation → ΟΧΙ JuDJIS, κατευθείαν FJC). Η γραμμή «Before:» αφαιρείται πρώτα·
+    αγνοείται το «X, District Judge, Presiding» (δικαστής της πρώτης βαθμίδας στην κεφαλίδα)."""
+    if not surname:
+        return False
+    head = PANEL_PAT.sub(" ", (text or "")[:AUTHOR_CHARS], count=1)
+    pat = re.compile(r"(?i:" + re.escape(surname) + r")\W{0,4}(?:(?:Jr|Sr|III|II)\.?\s*,?\s*)?[\s,.\-]*"
+                     r"(?i:(?:Chief\s+|Senior\s+|United\s+States\s+|U\.\s*S\.\s*)?District\s+Judge)\b(?!\s*,?\s*(?i:Presiding))")
+    return bool(pat.search(head))

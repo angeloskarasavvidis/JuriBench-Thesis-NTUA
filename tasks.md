@@ -53,11 +53,11 @@
 
 | # | Task | Ποιος | Κατάσταση | Σημειώσεις |
 |---|---|---|---|---|
-| R3-1 | Εξαγωγή των ~155 merits χωρίς συγγραφέα (`export_unknown_authors.py`) | εγώ → εσύ τρέχεις | 🔄 | Μόνο ανάγνωση. |
-| R3-2 | `data/author_overrides.csv` με το χέρι (cluster_id, author_str, author_initials, note) + εφαρμογή στο τέλος του `enrich_authors.py` (`author_source = manual`) | εγώ | ⏳ | ΟΧΙ απευθείας αλλαγή στο csv. |
-| R3-3 | `match_judjis`: εν ενεργεία στη `date_filed` (FJC) · μόνο ακριβές επώνυμο (+aliases, χωρίς fuzzy) · «District Judge» → όχι JuDJIS · αρχικά μόνο αν ≥2 υποψήφιοι | εγώ | ⏳ | Friedman 5, Bennett 3 (cluster_ids στο email). |
-| R3-4 | `ideology_fallback`: «District Judge» → κατευθείαν by designation · μοναδικός τη μέρα → αγνόησε ασύμβατα αρχικά (Haynes, Southwick, Bea, McKeown, Wardlaw) | εγώ | ⏳ | |
-| R3-5 | `dedupe.py` (καθηγητή, αμετάβλητο) τελευταίο βήμα → `juribench_cases.dedup.csv` + `dedupe_dropped.csv` | εγώ | ⏳ | Αναφορές/splits από το `.dedup.csv`. |
+| R3-1 | Εξαγωγή των ~155 merits χωρίς συγγραφέα (`export_unknown_authors.py`) | εγώ → εσύ τρέχεις | ✅ 2026-10-14 (155) | Μόνο ανάγνωση. |
+| R3-2 | `data/author_overrides.csv` με το χέρι (cluster_id, author_str, author_initials, note) + εφαρμογή στο τέλος του `enrich_authors.py` (`author_source = manual`) | εγώ | 🔄 140/155 συμπληρωμένα · 15 αναμένουν `export_ids_context.py` · κώδικας ✅ | ΟΧΙ απευθείας αλλαγή στο csv. Το αρχείο μπαίνει στο git (εξαίρεση στο .gitignore). |
+| R3-3 | `match_judjis`: εν ενεργεία στη `date_filed` (FJC) · μόνο ακριβές επώνυμο (+aliases, χωρίς fuzzy) · «District Judge» → όχι JuDJIS · αρχικά μόνο αν ≥2 υποψήφιοι | εγώ | ✅ κώδικας + test | Friedman 5, Bennett 3 (cluster_ids στο email). |
+| R3-4 | `ideology_fallback`: «District Judge» → κατευθείαν by designation · μοναδικός τη μέρα → αγνόησε ασύμβατα αρχικά (Haynes, Southwick, Bea, McKeown, Wardlaw) | εγώ | ✅ κώδικας + test (+ «District Judge» → μόνο διορισμοί District Court στο FJC) | |
+| R3-5 | `dedupe.py` (καθηγητή, αμετάβλητο) τελευταίο βήμα → `juribench_cases.dedup.csv` + `dedupe_dropped.csv` | εγώ | ✅ test | Αναφορές/splits από το `.dedup.csv`. |
 | R3-6 | Tests → labrat → έλεγχος (8 cluster_ids, Thomas, αριθμοί) → email | εγώ + εσύ | ⏳ | |
 
 ## Q. Ερωτήσεις προς τον καθηγητή (ΔΕΝ υλοποιούνται πριν απαντήσει)

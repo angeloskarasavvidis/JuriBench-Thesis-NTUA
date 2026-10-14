@@ -19,6 +19,9 @@ parsed from opinion_text.
 Adds/overwrites columns: author_str, author_source, author_initials, author_cl_id (κενό — δεν υπάρχει People FK).
 2026-10-13 (οδηγία καθηγητή): `author_initials` (π.χ. M. / N.R. / R.D.) από την υπογραφή, το «Opinion by»
 ή τη γραμμή «Before:» / «The Honorable … sitting by designation» (`author_initials.py`) — για συνωνυμίες.
+2026-10-14 (οδηγία καθηγητή): στο ΤΕΛΟΣ εφαρμόζεται το `data/author_overrides.csv` (συμπληρωμένο με το χέρι:
+cluster_id, author_str, author_initials, note) → αντικαθιστά author_str / author_initials και βάζει
+author_source = manual. Έτσι οι αλλαγές δεν χάνονται στο επόμενο τρέξιμο του pipeline.
 
 Usage:
   python code/enrich_authors.py                       # in-place στο data/juribench_dataset.csv
@@ -78,6 +81,28 @@ def main():
         src[j][source] += 1
         if surname:
             ini_src[j][isrc or "χωρίς αρχικά"] += 1
+
+    # --- χειροκίνητες διορθώσεις (data/author_overrides.csv) ---
+    ov_path = data_dir / "author_overrides.csv"
+    if ov_path.exists():
+        with open(ov_path, encoding="utf-8") as f:
+            overrides = {r["cluster_id"].strip(): r for r in csv.DictReader(f) if (r.get("cluster_id") or "").strip()}
+        by_id = {row.get("cluster_id"): row for row in rows if row.get("jurisdiction") in CIRCUITS}
+        applied = missing = 0
+        for cid, ov in overrides.items():
+            row = by_id.get(cid)
+            if row is None:
+                missing += 1
+                continue
+            row["author_str"] = (ov.get("author_str") or "").strip()
+            row["author_initials"] = (ov.get("author_initials") or "").strip()
+            row["author_source"] = "manual"
+            applied += 1
+        print(f"\nOverrides ({ov_path.name}): {len(overrides)} γραμμές · εφαρμόστηκαν {applied} · "
+              f"δεν βρέθηκαν στο dataset {missing} · με συγγραφέα "
+              f"{sum(1 for o in overrides.values() if (o.get('author_str') or '').strip())}")
+    else:
+        print(f"\n(δεν υπάρχει {ov_path} — καμία χειροκίνητη διόρθωση)")
 
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fieldnames)

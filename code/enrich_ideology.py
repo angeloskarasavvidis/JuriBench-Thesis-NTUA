@@ -16,6 +16,8 @@ CA5/CA9 : match author_str -> JuDJIS agjudge_full.csv via Jaro-Winkler >= 0.92
           -> judjis_score -> threshold +-0.3 -> ideology/ideology_class
           (ideology_source="judjis"). Unmatched authors dropped (counted),
           NOT gpt4o-fallbacked (banned per issues.md #5).
+          2026-10-14 (καθηγητής): ΑΚΡΙΒΕΣ επώνυμο (όχι fuzzy) · εν ενεργεία στη date_filed · «District
+          Judge» → όχι JuDJIS — βλ. match_judjis().
           2026-10-13 (καθηγητής): match με (αρχικά, επώνυμο). Συνωνυμία = ≥2 δικαστές του circuit με
           το ίδιο επώνυμο στο JuDJIS ή στο FJC (όσοι υπηρέτησαν στην περίοδο του dataset). Τότε
           κρατιέται μόνο ο δικαστής με συμβατά `author_initials`· αλλιώς ΚΕΝΟ (όχι το πρώτο match).
@@ -36,6 +38,7 @@ import jellyfish  # Jaro-Winkler
 
 sys.path.insert(0, str(Path(__file__).parent))
 from judge_aliases import surname_variants, norm as alias_norm, initials_of_name, initials_ok, initials_conflict  # noqa: E402
+from author_initials import signed_as_district  # noqa: E402
 
 csv.field_size_limit(sys.maxsize)
 
@@ -140,6 +143,7 @@ def load_fjc_people(period):
                 if (st and hi and st > hi) or (en and lo and en < lo):
                     continue
                 out[c].append({"nid": r.get("nid") or r.get("Last Name"), "last": alias_norm(r.get("Last Name")),
+                               "start": st, "end": en,
                                "ini": initials_of_name(r.get("First Name"), r.get("Middle Name")),
                                "name": f"{r.get('First Name', '')} {r.get('Middle Name', '')} {r.get('Last Name', '')}"})
     return out
@@ -198,72 +202,81 @@ def circuit_key(s):
     return m.group(1) if m else ""
 
 
-def match_judjis(author_str, judjis_roster, court_name, jurisdiction="", initials="", stats=None, fjc=None):
-    """2026-10-13 (οδηγία καθηγητή): αντιστοίχιση με (αρχικά, επώνυμο).
-    1. υποψήφιοι = δικαστές JuDJIS του ίδιου circuit με το ίδιο επώνυμο (ή ταύτιση/διόρθωση OCR)·
-       αν δεν υπάρχει κανείς, όσοι έχουν Jaro-Winkler >= 0.92 (όπως πριν).
-    2. 1 υποψήφιος → αυτός. ≥2 → κρατώ όσους έχουν συμβατά αρχικά· αν δεν μείνει ΑΚΡΙΒΩΣ 1 → κενό
-       (ΟΧΙ το πρώτο match)."""
+def _active(p, d):
+    """Εν ενεργεία τη μέρα d (tuple y,m,d); χωρίς ημερομηνία υπόθεσης → True."""
+    if not d:
+        return True
+    return (p["start"] is None or p["start"] <= d) and (p["end"] is None or d <= p["end"])
+
+
+def _stat(stats, key, detail=None):
+    if stats is not None:
+        stats[key] += 1
+        if detail:
+            stats["  " + detail] += 1
+
+
+def match_judjis(author_str, judjis_roster, court_name, jurisdiction="", initials="", stats=None, fjc=None,
+                 date=None, district=False):
+    """Οδηγίες καθηγητή (2026-10-13 / 2026-10-14):
+    0. Υπογραφή «District Judge» → by designation → ΟΧΙ JuDJIS (πάει στο FJC από το ideology_fallback).
+    1. Υποψήφιοι JuDJIS: ίδιο circuit + ΑΚΡΙΒΕΣ επώνυμο (ή ταύτιση / διόρθωση OCR από judge_aliases). Όχι fuzzy.
+    2. FJC: δικαστές του circuit με αυτό το επώνυμο, ΕΝ ΕΝΕΡΓΕΙΑ τη μέρα της απόφασης (date_filed):
+       - μόνο ένας → αυτός (τα αρχικά αγνοούνται, π.χ. λάθος «O.» στον Bea)
+       - ≥2 → αρχικά (υπογραφή / «Before:»)· αν δεν μένει ακριβώς ένας → κενό
+       - κανένας (π.χ. ο δικαστής του circuit είχε αποχωρήσει) → μόνο JuDJIS: 1 υποψήφιος (αν τα αρχικά
+         δεν συγκρούονται) · ≥2 → αρχικά · αλλιώς κενό
+    Ο δικαστής που επιλέγεται στο FJC αντιστοιχίζεται στον υποψήφιο του JuDJIS με συμβατό μικρό όνομα."""
     if not author_str:
+        return None
+    a = alias_norm(author_str)
+    if district:
+        _stat(stats, "υπογραφή «District Judge» → by designation, όχι JuDJIS", f"{jurisdiction} {a}")
         return None
     ck = circuit_key(court_name) or circuit_key(jurisdiction)
     variants = surname_variants(author_str, jurisdiction)
-    pool = []
-    for j in judjis_roster:
-        jk = circuit_key(j["court"])
-        # απόκλεισε ΜΟΝΟ όταν ΚΑΙ οι δύο πλευρές δίνουν σαφή, διαφορετικό circuit
-        if ck and jk and ck != jk:
-            continue
-        pool.append(j)
-    exact = [j for j in pool if alias_norm(j["last_name"]) in variants]
-    if not exact:
-        for j in pool:
-            s = max(jellyfish.jaro_winkler_similarity(author_str.lower(), j["full_name"].lower()),
-                    jellyfish.jaro_winkler_similarity(author_str.lower(), j["last_name"].lower()),
-                    *[jellyfish.jaro_winkler_similarity(a, alias_norm(j["last_name"])) for a in variants])
-            if s >= JW_THRESHOLD:
-                exact.append(j)
-    cands = list({(j["full_name"], j["court"]): j for j in exact}.values())
-    # συνωνυμία στο circuit κατά το FJC (π.χ. Thomas: Sidney + Holly — το JuDJIS έχει μόνο τον Sidney)
-    people = list({p["nid"]: p for p in (fjc or {}).get(ck, []) if p["last"] in variants}.values())
-    if len(people) >= 2 and cands:
-        compat = [p for p in people if initials and initials_ok(initials, p["ini"])]
-        if len(compat) != 1:
-            if stats is not None:
-                stats["συνωνυμία στο FJC → κενό" + (" (ασύμβατα/πολλά αρχικά)" if initials else " (χωρίς αρχικά)")] += 1
-                stats["  " + jurisdiction + " " + alias_norm(author_str) + (f" [{initials}]" if initials else "")
-                      + " · FJC: " + " / ".join(sorted(p["name"].split()[0] + " " + p["ini"] for p in people))] += 1
-            return None
-        target = compat[0]["ini"]
-        keep = [j for j in cands if initials_ok(target, initials_of_name(j["first_name"]))]
-        if len(keep) == 1:
-            if stats is not None:
-                stats["συνωνυμία → λύθηκε με αρχικά"] += 1
-            return keep[0]
-        if stats is not None:
-            stats["συνωνυμία → ο δικαστής δεν υπάρχει (μοναδικός) στο JuDJIS → κενό"] += 1
-            stats["  " + jurisdiction + " " + alias_norm(author_str) + f" [{initials}] = {compat[0]['name'].strip()}"] += 1
-        return None
-    if len(cands) == 1:
-        # αρχικά υποψηφίου: από το FJC (μικρό + μεσαίο) όταν υπάρχει ένας· αλλιώς μόνο το μικρό του JuDJIS
-        # (π.χ. «E. Grady Jolly»: JuDJIS «E.» αλλά FJC «E.G.» → το «G.» δεν είναι σύγκρουση)
-        cand_ini = people[0]["ini"] if len(people) == 1 else initials_of_name(cands[0]["first_name"])
-        if initials and initials_conflict(initials, cand_ini):
-            if stats is not None:
-                stats["μοναδικός υποψήφιος με ασύμβατα αρχικά → κενό"] += 1
-                stats["  " + jurisdiction + " " + alias_norm(author_str) + f" [{initials}] ≠ {cands[0]['full_name']}"] += 1
-            return None
-        return cands[0]
+    cands = [j for j in judjis_roster if alias_norm(j["last_name"]) in variants and
+             not (ck and circuit_key(j["court"]) and circuit_key(j["court"]) != ck)]
+    cands = list({(j["full_name"], j["court"]): j for j in cands}.values())
     if not cands:
         return None
+    people = [p for p in (fjc or {}).get(ck, []) if p["last"] in variants]
+    active = list({p["nid"]: p for p in people if _active(p, date)}.values())
+
+    def pick(target_ini, how):
+        keep = [j for j in cands if initials_ok(target_ini, initials_of_name(j["first_name"]))]
+        if len(keep) == 1:
+            if how:
+                _stat(stats, how)
+            return keep[0]
+        _stat(stats, "ο δικαστής του FJC δεν βρέθηκε (μοναδικός) στο JuDJIS → κενό",
+              f"{jurisdiction} {a} [{initials}] = {target_ini}")
+        return None
+
+    if len(active) == 1:
+        how = "συνωνυμία → λύθηκε με την ημερομηνία (μόνο ένας εν ενεργεία)" if \
+            len({p["nid"] for p in people}) > 1 else ""
+        return pick(active[0]["ini"], how)
+    if len(active) >= 2:
+        compat = [p for p in active if initials and initials_ok(initials, p["ini"])]
+        if len(compat) == 1:
+            return pick(compat[0]["ini"], "συνωνυμία → λύθηκε με αρχικά")
+        _stat(stats, "συνωνυμία (≥2 εν ενεργεία) → κενό" + (" (ασύμβατα/πολλά αρχικά)" if initials else " (χωρίς αρχικά)"),
+              f"{jurisdiction} {a}" + (f" [{initials}]" if initials else "") + " · FJC: " +
+              " / ".join(sorted(p["name"].split()[0] + " " + p["ini"] for p in active)))
+        return None
+    # κανένας εν ενεργεία στο FJC εκείνη τη μέρα → μόνο JuDJIS
+    if len(cands) == 1:
+        if initials and initials_conflict(initials, initials_of_name(cands[0]["first_name"])):
+            _stat(stats, "κανείς εν ενεργεία στο FJC + ασύμβατα αρχικά → κενό",
+                  f"{jurisdiction} {a} [{initials}] ≠ {cands[0]['full_name']}")
+            return None
+        return cands[0]
     keep = [j for j in cands if initials and initials_ok(initials, initials_of_name(j["first_name"]))]
     if len(keep) == 1:
-        if stats is not None:
-            stats["συνωνυμία → λύθηκε με αρχικά"] += 1
+        _stat(stats, "συνωνυμία → λύθηκε με αρχικά")
         return keep[0]
-    if stats is not None:
-        stats["συνωνυμία → κενό (χωρίς/ασύμβατα αρχικά)" if initials else "συνωνυμία → κενό (χωρίς αρχικά)"] += 1
-        stats["  " + jurisdiction + " " + alias_norm(author_str) + (f" [{initials}]" if initials else "")] += 1
+    _stat(stats, "συνωνυμία στο JuDJIS → κενό", f"{jurisdiction} {a}" + (f" [{initials}]" if initials else ""))
     return None
 
 
@@ -318,8 +331,11 @@ def enrich_circuits(rows, judjis_roster, fjc=None):
         if not author_str:
             no_author_str += 1
             continue
+        d = row.get("date_filed") or ""
+        d = tuple(int(x) for x in d.split("-")[:3]) if re.match(r"\d{4}-\d{2}-\d{2}", d) else None
         hit = match_judjis(author_str, judjis_roster, row.get("court", ""), row.get("jurisdiction", ""),
-                           row.get("author_initials", ""), stats, fjc)
+                           row.get("author_initials", ""), stats, fjc, date=d,
+                           district=signed_as_district(row.get("opinion_text"), author_str))
         if not hit:
             unmatched += 1
             continue
@@ -329,7 +345,7 @@ def enrich_circuits(rows, judjis_roster, fjc=None):
         matched += 1
 
     print(f"Circuits: {matched} JuDJIS-matched, {no_author_str} missing author_str "
-          f"(run enrich_authors.py first), {unmatched} no JuDJIS match (ή αμφίσημο)")
+          f"(run enrich_authors.py first), {unmatched} χωρίς JuDJIS (δεν υπάρχει / αμφίσημο / District Judge)")
     for k, v in sorted(stats.items(), key=lambda x: (x[0].startswith("  "), -x[1]))[:40]:
         print(f"  {k}: {v}")
 
