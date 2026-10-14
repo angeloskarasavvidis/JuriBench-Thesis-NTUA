@@ -58,7 +58,7 @@
 | R3-3 | `match_judjis`: εν ενεργεία στη `date_filed` (FJC) · μόνο ακριβές επώνυμο (+aliases, χωρίς fuzzy) · «District Judge» → όχι JuDJIS · αρχικά μόνο αν ≥2 υποψήφιοι | εγώ | ✅ κώδικας + test | Friedman 5, Bennett 3 (cluster_ids στο email). |
 | R3-4 | `ideology_fallback`: «District Judge» → κατευθείαν by designation · μοναδικός τη μέρα → αγνόησε ασύμβατα αρχικά (Haynes, Southwick, Bea, McKeown, Wardlaw) | εγώ | ✅ κώδικας + test (+ «District Judge» → μόνο διορισμοί District Court στο FJC) | |
 | R3-5 | `dedupe.py` (καθηγητή, αμετάβλητο) τελευταίο βήμα → `juribench_cases.dedup.csv` + `dedupe_dropped.csv` | εγώ | ✅ test | Αναφορές/splits από το `.dedup.csv`. |
-| R3-6 | Tests → labrat → έλεγχος (8 cluster_ids, Thomas, αριθμοί) → email | εγώ + εσύ | ⏳ | |
+| R3-6 | Tests → labrat → έλεγχος (8 cluster_ids, Thomas, αριθμοί) → email | εγώ + εσύ | ✅ 2026-10-14 · email εκκρεμεί | 8 cluster_ids ✅ (Friedman P.L. → D party_fjc, Bennett R.D. → R party_fjc, χωρίς JuDJIS) · Thomas 37 με ημερομηνία ✅ · 5 λάθος αρχικά ✅ · overrides 163 (155 + 8 του καθηγητή) · JuDJIS 7.460 · fallback 8.576 · dedupe 10.395 → 9.725 (SCOTUS compare pages 61, όχι 12) · 8443025 = 1ου Circuit (Howard) → ερώτηση |
 
 ## Q. Ερωτήσεις προς τον καθηγητή (ΔΕΝ υλοποιούνται πριν απαντήσει)
 
