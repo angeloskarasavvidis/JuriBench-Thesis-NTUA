@@ -49,6 +49,17 @@
 | R2-5 | `clean_headers`: υπόλοιπες κεφαλίδες ECF CA5 («Page:1» κ.λπ.) | εγώ | ✅ κώδικας 2026-10-13 (test συνθετικά) | Με βάση τα δείγματα του R2-0. |
 | R2-6 | Συνθετικά tests → push → τρέξιμο στο labrat → έλεγχος αριθμών → email + dataset | εγώ + εσύ | ✅ 2026-10-14 · email στάλθηκε, αναμονή απάντησης | Nelson R. 78 / D.W. 24 · Smith M. 245 / N.R. 52 · Thomas S.R. 60, H.A. 10 κενό JuDJIS, 37 χωρίς αρχικά κενό · order 234 · JuDJIS 7.385 · fallback 8.433 (party_fjc 523, αμφίσημα ίδιου circuit 1). Διορθώσεις στο δρόμο: «O’» ως αρχικό (O'Scannlain 83), visiting όταν αρχικά ≠ δικαστών circuit (Pregerson D.D. κ.ά.), αρχικά FJC (E. Grady Jolly), ISO ημερομηνίες FJC (King 126). Για email: ~6 λάθος αρχικά (Bea/Wardlaw/McKeown…) → κενό · 4 CA5 μπερδεμένες κεφαλίδες · 12 SCOTUS «Differences exist between documents» · 37 Thomas με ημερομηνία; | Στόχοι: Nelson ~79/24, Smith ~245/58, Thomas ~57/11, order 234, ECF υπόλοιπα 0. |
 
+## R3. 3η απάντηση καθηγητή (2026-10-14)
+
+| # | Task | Ποιος | Κατάσταση | Σημειώσεις |
+|---|---|---|---|---|
+| R3-1 | Εξαγωγή των ~155 merits χωρίς συγγραφέα (`export_unknown_authors.py`) | εγώ → εσύ τρέχεις | 🔄 | Μόνο ανάγνωση. |
+| R3-2 | `data/author_overrides.csv` με το χέρι (cluster_id, author_str, author_initials, note) + εφαρμογή στο τέλος του `enrich_authors.py` (`author_source = manual`) | εγώ | ⏳ | ΟΧΙ απευθείας αλλαγή στο csv. |
+| R3-3 | `match_judjis`: εν ενεργεία στη `date_filed` (FJC) · μόνο ακριβές επώνυμο (+aliases, χωρίς fuzzy) · «District Judge» → όχι JuDJIS · αρχικά μόνο αν ≥2 υποψήφιοι | εγώ | ⏳ | Friedman 5, Bennett 3 (cluster_ids στο email). |
+| R3-4 | `ideology_fallback`: «District Judge» → κατευθείαν by designation · μοναδικός τη μέρα → αγνόησε ασύμβατα αρχικά (Haynes, Southwick, Bea, McKeown, Wardlaw) | εγώ | ⏳ | |
+| R3-5 | `dedupe.py` (καθηγητή, αμετάβλητο) τελευταίο βήμα → `juribench_cases.dedup.csv` + `dedupe_dropped.csv` | εγώ | ⏳ | Αναφορές/splits από το `.dedup.csv`. |
+| R3-6 | Tests → labrat → έλεγχος (8 cluster_ids, Thomas, αριθμοί) → email | εγώ + εσύ | ⏳ | |
+
 ## Q. Ερωτήσεις προς τον καθηγητή (ΔΕΝ υλοποιούνται πριν απαντήσει)
 
 | # | Ερώτηση | Από | Σημειώσεις |
