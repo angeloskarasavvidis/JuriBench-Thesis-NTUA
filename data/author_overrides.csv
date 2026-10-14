@@ -139,3 +139,18 @@ cluster_id,author_str,author_initials,note
 8442444,Du,,"«DU,. District Judge:» — by designation (OCR)"
 2853486,Tashima,,"OCR «TASHIMA.,»"
 2807531,Nguyen,,"OCR «NGUYEN, .Circuit Judge:»"
+10006837,Jones,E.H.,"en banc «X, Circuit Judge, joined by …»"
+9490033,Elrod,J.W.,"en banc «X, Circuit Judge, joined by …»"
+4978313,,,"κοινή γνώμη «Elrod and Willett, Circuit Judges, joined by …» — όχι ένας συγγραφέας"
+4568914,,,en banc — δεν φαίνεται υπογραφή στο κείμενο (ξεκινά απευθείας με το σκεπτικό)
+4536189,,,en banc — δεν φαίνεται υπογραφή στο κείμενο (ξεκινά με «I. FACTUAL BACKGROUND»)
+4479188,,,δεν φαίνεται υπογραφή στο κείμενο (ξεκινά απευθείας με το σκεπτικό)
+4454244,Higginbotham,P.E.,"OCR «HIGGINBOTHAM, ’ Circuit Judge:»"
+8443025,,,«HOWARD; Chief Judge.» — υπόθεση 1ου Circuit (Chief Judge Howard)· πιθανόν λάθος δικαστήριο στο CourtListener → ερώτηση
+8442681,Jordan,D.P.,"«DANIEL P. JORDAN III, District Judge.» — by designation (ίδια υπόθεση με 3204950)"
+3180964,Boyle,J.J.,"«JANE J. BOYLE, District Judge.» — by designation"
+2818154,Higginson,S.A.,"OCR «STEPHEN A. fflGGINSON, Circuit Judge.»"
+9367664,Freudenthal,N.D.,«Opinion By Judge Freudenthal» — district judge by designation
+4772730,,,δεν φαίνεται συγγραφέας στο κείμενο (μόνο κεφαλίδα/caption)
+4583856,Smith,M.D.,"«M. SMITH, Circuit Judge:» μετά από μεγάλη κεφαλίδα· Before: MILAN D. SMITH, JR."
+4453996,Gritzner,,"«GRITZNER, District Judge.» — by designation"

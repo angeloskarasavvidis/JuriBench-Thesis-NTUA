@@ -28,19 +28,18 @@
 **Σημείωση (2026-10-14):** το `enrich_ideology.py` χωρίς σημαία ξαναγράφει ΚΑΙ τα SCOTUS (όνομα+έτος, χειρότερο)
 → ή τρέχεις μετά `enrich_scdb.py` (~25′), ή `enrich_ideology.py --circuits-only` (δεν αγγίζει SCOTUS).
 
-**Σειρά στο labrat** (`cd /data/mkoniaris/akar/JuriBench && git pull`, env ενεργό):
+**Σειρά στο labrat (από 2026-10-14, 3ος γύρος)** (`git pull`, env ενεργό):
 ```
-# (ο διαχωρισμός ΔΕΝ ξανατρέχει στον 2ο γύρο)  python code/split_opinions.py --from-dump data/opinions_by_type.jsonl.gz --text-split
-python code/clean_headers.py
-python code/enrich_authors.py --input data/juribench_cases.csv --output data/juribench_cases.csv
+python code/clean_headers.py                      # (αν αλλάξει κάτι στις κεφαλίδες)
+python code/enrich_authors.py --input data/juribench_cases.csv --output data/juribench_cases.csv   # + data/author_overrides.csv
 python code/opinion_kind.py
-python code/enrich_ideology.py --input data/juribench_cases.csv --output data/juribench_cases.csv
-B=/data/mkoniaris/akar/bulk; D=2026-06-30
-python code/enrich_scdb.py --clusters $B/opinion-clusters-$D.csv.bz2 --dockets $B/dockets-$D.csv.bz2 --citations $B/citations-$D.csv.bz2
+python code/enrich_ideology.py --circuits-only --input data/juribench_cases.csv --output data/juribench_cases.csv
 python code/ideology_fallback.py
-python code/check_authors.py
-python code/completeness_report.py --md data/completeness_report.md
+python code/dedupe.py --input data/juribench_cases.csv --output data/juribench_cases.dedup.csv --dropped data/dedupe_dropped.csv   # ΤΕΛΕΥΤΑΙΟ
+python code/completeness_report.py --input data/juribench_cases.dedup.csv --md data/completeness_report.md
 ```
+Το τελικό dataset είναι το **`juribench_cases.dedup.csv`** (splits / finetune από αυτό). `enrich_scdb.py` μόνο αν
+τρέξει `enrich_ideology.py` χωρίς `--circuits-only`.
 Προσοχή: `clean_headers` / `opinion_kind` / `ideology_fallback` κρατούν backup (.pre_clean / .pre_kind /
 .pre_fallback) **μόνο αν δεν υπάρχει ήδη** → σε 2ο τρέξιμο το backup είναι το παλιό.
 Μετά: αριθμοί → tasks.md, σύντομο email στον καθηγητή, splits/finetune data (C7).
