@@ -1,7 +1,8 @@
 # tasks.md — Λίστα εργασιών JuriBench
 
 Όλα τα tasks της διπλωματικής σε ένα σημείο: πότε ζητήθηκαν, από ποιον, και αν έγιναν.
-Ενημερώνεται σε κάθε session μαζί με το `CLAUDE.md` (εκεί υπάρχει το πλήρες context).
+Ενημερώνεται σε κάθε session μαζί με το `CLAUDE.md` (εκεί υπάρχει το πλήρες context) — **μόνο με έγκριση του χρήστη**.
+**Τρέχουσα κατάσταση (2026-10-15):** τελικό dataset = `juribench_labeled.dedup.csv` (9.347) · επόμενο: R4-3 / R4-4 · labrat σε παύση.
 
 **Status:** ✅ έγινε · 🔄 σε εξέλιξη · ⏳ εκκρεμεί · 👤 το κάνει ο καθηγητής · 💤 παρκαρισμένο
 **Ημερομηνίες:** το «~» σημαίνει κατά προσέγγιση (ανακατασκευή από το ιστορικό συνομιλιών).
@@ -75,15 +76,15 @@
 
 | # | Ερώτηση | Από | Σημειώσεις |
 |---|---|---|---|
-| Q1 | 88% των υποθέσεων (9.158) είναι μόνο `010combined` → majority + dissents ενωμένα. Να τα χωρίσουμε από το κείμενο (επικεφαλίδες «JUSTICE X, dissenting» / «Y, Circuit Judge, dissenting»); | 2026-10-10 | Δοκιμασμένο: ~1.930 θα χωρίζονταν, ~0,3% πιθανά λάθη. Έτοιμο ως `--text-split` (λεπτά από το dump). |
-| Q2 | Πού πάνε οι τύποι που δεν όρισε: `035concurrenceinpart` (120), `070rehearing` (3), `025plurality`/`015unamimous` (0 στα δεδομένα); Και τι κάνουμε με τις 3 υποθέσεις που δεν έχουν ούτε `020lead` ούτε `010combined`; | 2026-10-08 | = A3. Προσωρινά: δεν μπαίνουν πουθενά· οι 3 κράτησαν το παλιό κείμενο. Αλλαγή σε λεπτά με `--from-dump`. |
-| Q3 | Αποφάσεις που δεν είναι επί της ουσίας (επείγουσες αιτήσεις SCOTUS «…A…», dissents from denial of cert, απορρίψεις rehearing en banc): κρατούνται ή σημαίνονται/εξαιρούνται; | 2026-10-10 | = A2c. ~16 στο SCOTUS χωρίς SCDB + αρκετές en banc στα circuits. |
-| Q4 | Επανεξαγωγή `disposition` από τη νέα majority (A4); Η παλιά βγήκε από το τέλος κειμένου που συχνά ήταν dissent. | 2026-10-10 | Κόστος ~€1–2 (OpenRouter). |
-| Q5 | Καθάρισμα κεφαλίδων σελίδας PDF στα CA5/CA9 (A2b); | 2026-10-10 | Θόρυβος στο κείμενο-στόχο. |
-| Q7 | A7: «για όλους τους circuit δικαστές» — περιλαμβάνονται και οι **district judges by designation** που γράφουν αποφάσεις εφετείων; (Το JCS δεν τους έχει· το FJC θα έδινε κόμμα.) | 2026-10-11 | Προσωρινά: μόνο δικαστές με διορισμό στο CA5/CA9· οι άλλοι κενοί. |
-| Q8 | **author_str λάθος σε ~41% (CA5) / ~46% (CA9)** — συνήθως ο τελευταίος της σύνθεσης («Before»), όχι ο συγγραφέας. Να διορθωθεί η εξαγωγή (CA9 «Opinion by Judge X», byline «X, Circuit Judge:», per curiam → κενό) και να ξανατρέξουν JuDJIS ideology, A7 fallback και splits; | 2026-10-11 | Επηρεάζει τα `ideology`/`ideology_score` των circuits (δεν τα αλλάζουμε χωρίς έγκριση) και το author-disjoint. Η σωστή εξαγωγή λύνει και τα αμφίσημα Smith/Nelson/Thomas («Opinion by Judge M. Smith»). |
-| Q9 | A7: να ταυτιστούν οι Richman = Owen, Forrest = Hunsaker, Ramirez = «Carrillo Ramirez» στο JCS (ίδια πρόσωπα, άλλο όνομα); | 2026-10-11 | +~219 υποθέσεις με JCS αντί για κόμμα. |
-| Q6 | SCDB: εκτός από `scdb_id`, συμπληρώνουμε από το ίδιο match και `issue_area`, `decision_direction`, ιδεολογία Martin-Quinn; | 2026-10-10 | Έτσι υλοποιήθηκε (θεωρήθηκε μέρος του «βελτίωσης μεταδεδομένων»). Να επιβεβαιωθεί. |
+| Q1 | 88% των υποθέσεων (9.158) είναι μόνο `010combined` → majority + dissents ενωμένα. Να τα χωρίσουμε από το κείμενο (επικεφαλίδες «JUSTICE X, dissenting» / «Y, Circuit Judge, dissenting»); | 2026-10-10 | Δοκιμασμένο: ~1.930 θα χωρίζονταν, ~0,3% πιθανά λάθη. Έτοιμο ως `--text-split` (λεπτά από το dump). **→ ✅ απαντήθηκε 2026-10-12: ναι, χωρισμός με επικεφαλίδες (split_method)** |
+| Q2 | Πού πάνε οι τύποι που δεν όρισε: `035concurrenceinpart` (120), `070rehearing` (3), `025plurality`/`015unamimous` (0 στα δεδομένα); Και τι κάνουμε με τις 3 υποθέσεις που δεν έχουν ούτε `020lead` ούτε `010combined`; | 2026-10-08 | = A3. Προσωρινά: δεν μπαίνουν πουθενά· οι 3 κράτησαν το παλιό κείμενο. Αλλαγή σε λεπτά με `--from-dump`. **→ ⏳ ακόμη ανοιχτό (035/070 αγνοούνται)** |
+| Q3 | Αποφάσεις που δεν είναι επί της ουσίας (επείγουσες αιτήσεις SCOTUS «…A…», dissents from denial of cert, απορρίψεις rehearing en banc): κρατούνται ή σημαίνονται/εξαιρούνται; | 2026-10-10 | = A2c. ~16 στο SCOTUS χωρίς SCDB + αρκετές en banc στα circuits. **→ ✅ λύθηκε με opinion_kind (καμία αφαίρεση)** |
+| Q4 | Επανεξαγωγή `disposition` από τη νέα majority (A4); Η παλιά βγήκε από το τέλος κειμένου που συχνά ήταν dissent. | 2026-10-10 | Κόστος ~€1–2 (OpenRouter). **→ ⏳ ακόμη ανοιχτό** |
+| Q5 | Καθάρισμα κεφαλίδων σελίδας PDF στα CA5/CA9 (A2b); | 2026-10-10 | Θόρυβος στο κείμενο-στόχο. **→ ✅ έγινε (clean_headers.py)** |
+| Q7 | A7: «για όλους τους circuit δικαστές» — περιλαμβάνονται και οι **district judges by designation** που γράφουν αποφάσεις εφετείων; (Το JCS δεν τους έχει· το FJC θα έδινε κόμμα.) | 2026-10-11 | Προσωρινά: μόνο δικαστές με διορισμό στο CA5/CA9· οι άλλοι κενοί. **→ ✅ ναι → party_fjc + author_visiting** |
+| Q8 | **author_str λάθος σε ~41% (CA5) / ~46% (CA9)** — συνήθως ο τελευταίος της σύνθεσης («Before»), όχι ο συγγραφέας. Να διορθωθεί η εξαγωγή (CA9 «Opinion by Judge X», byline «X, Circuit Judge:», per curiam → κενό) και να ξανατρέξουν JuDJIS ideology, A7 fallback και splits; | 2026-10-11 | Επηρεάζει τα `ideology`/`ideology_score` των circuits (δεν τα αλλάζουμε χωρίς έγκριση) και το author-disjoint. Η σωστή εξαγωγή λύνει και τα αμφίσημα Smith/Nelson/Thomas («Opinion by Judge M. Smith»). **→ ✅ λύθηκε με parse_author.py του καθηγητή** |
+| Q9 | A7: να ταυτιστούν οι Richman = Owen, Forrest = Hunsaker, Ramirez = «Carrillo Ramirez» στο JCS (ίδια πρόσωπα, άλλο όνομα); | 2026-10-11 | +~219 υποθέσεις με JCS αντί για κόμμα. **→ ✅ ναι → judge_aliases.py** |
+| Q6 | SCDB: εκτός από `scdb_id`, συμπληρώνουμε από το ίδιο match και `issue_area`, `decision_direction`, ιδεολογία Martin-Quinn; | 2026-10-10 | Έτσι υλοποιήθηκε (θεωρήθηκε μέρος του «βελτίωσης μεταδεδομένων»). Να επιβεβαιωθεί. **→ ✅ ναι (έτσι έμεινε)** |
 
 ## B. Αιτήματα καθηγητή — προηγούμενη συνάντηση (~2026-10-03)
 
@@ -106,14 +107,14 @@
 | C4 | `enrich_scdb_ids.py` (ακριβές SCOTUS↔SCDB μέσω `scdb_id`) | 2026-10-06 | ✅ | ideology SCOTUS 429→528, issue_area 458→559. **Αντικαταστάθηκε** από το `enrich_scdb.py` (A5). |
 | C5 | `completeness_report.py` | 2026-10-06 | ✅ | |
 | C6 | `lawma_label.py` default input → `juribench_cases.csv` | 2026-10-06 | ✅ | |
-| C7 | Μετά το Lawma: `completeness_report` + `make_splits` + `build_finetune` πάνω στο `juribench_labeled.csv` | ~2026-10-06 | ⏳ | Περιμένει B2 (και πιθανώς A1–A8). |
+| C7 | Μετά το Lawma: `make_splits` + `build_finetune` πάνω στο **`juribench_labeled.dedup.csv`** (καθηγητή) | ~2026-10-06 | ⏳ | Το Lawma έγινε (2026-10-15). Πριν: προτάσεις R4-3 (έγκριση χρήστη). |
 | C8 | Προσθήκη `jellyfish`, `python-dotenv`, `awscli` στο `requirements.txt` | ~2026-10-06 | ✅ 2026-10-10 | jellyfish/python-dotenv υπήρχαν ήδη· προστέθηκε awscli. |
 | C9 | Προσαρμογή `train_qlora.py` / `generate.py` για Qwen3.5 / Gemma 4 (πολυτροπική αρχιτεκτονική, `enable_thinking=False`) | 2026-10-06 | ⏳ | Όταν κλειδώσει η λίστα μοντέλων. |
 | C10 | Prune περιττών στηλών (`court`, `judge_id`, `author_cl_id`, `syllabus`, σταθερά `*_source`) | ~2026-10-03 | 💤 | Εκκρεμεί απόφαση χρήστη. |
 | C11 | Ενημέρωση `docs/components.md` με τα νέα scripts | ~2026-10-06 | ✅ 2026-10-10 | bulk_filter, split_opinions, inspect_split, enrich_scdb, enrich_scdb_ids, completeness_report. |
-| C14 | Μεταφορά από Cowork σε **Claude Code** (το CLAUDE.md φορτώνεται αυτόματα) | 2026-10-10 | 🔄 | CLAUDE.md ανανεώθηκε με ενότητα «Ξεκίνα από εδώ». |
+| C14 | Μεταφορά από Cowork σε **Claude Code** (το CLAUDE.md φορτώνεται αυτόματα) | 2026-10-10 | ✅ 2026-10-15 | CLAUDE.md ξαναγράφτηκε πλήρως. Το labrat σε παύση. |
 | C12 | Διόρθωση διατύπωσης διάγνωσης στο `completeness_report` («χωρίς match» = και χωρίς scdb_id) | 2026-10-06 | ⏳ | Μικρό. |
-| C13 | Revoke εκτεθειμένου OpenRouter key + αφαίρεση hardcoded default | ~2026-09-11 | 💤 | Ο χρήστης επέλεξε να το αφήσει προς το παρόν. Repo public. |
+| C13 | Revoke εκτεθειμένου OpenRouter key + αφαίρεση hardcoded default | ~2026-09-11 | 🔄 | Hardcoded default **αφαιρέθηκε** (~2026-10-12, `LLM_API_KEY`). Το revoke το κάνει ο χρήστης — άγνωστο αν έγινε. |
 
 ## D. Αξιολόγηση (υλοποίηση μετρικών)
 

@@ -45,14 +45,44 @@
 - **Πρόβλημα που λύνει:** «Revisions»/επανεκδόσεις της ίδιας υπόθεσης μόλυναν το σύνολο.
 
 ### enrich_authors.py
-- **Τι κάνει:** Βρίσκει τον συγγραφέα δικαστή (circuits).
-- **Πώς το κάνει (τεχνικά):** Byline-anchored regex στα πρώτα ~2000 chars του opinion.
-- **Πρόβλημα που λύνει:** Η αρχική εξαγωγή ονομάτων έβγαζε σκουπίδια, χαλώντας το ideology matching.
+- **Τι κάνει:** Βρίσκει τον συγγραφέα δικαστή (circuits): `author_str`, `author_source` (signature / opinion_by / none / manual), `author_initials`.
+- **Πώς το κάνει (τεχνικά):** Από 2026-10-12 χρησιμοποιεί το `parse_author.py` του καθηγητή (αμετάβλητο) + `author_initials.py`· στο τέλος εφαρμόζει το `data/author_overrides.csv` (χειροκίνητα, `author_source = manual`).
+- **Πρόβλημα που λύνει:** Η παλιά regex έπαιρνε τον τελευταίο της γραμμής «Before» (σωστό μόνο ~55%) → τώρα ~99%.
+
+### parse_author.py  *(του καθηγητή — ΑΜΕΤΑΒΛΗΤΟ)*
+- **Τι κάνει:** `parse_author(text) -> (surname, source)` — αφαιρεί τη γραμμή σύνθεσης και βρίσκει την υπογραφή ή το «Opinion by Judge X».
+
+### author_initials.py
+- **Τι κάνει:** Αρχικά του συγγραφέα (για συνωνυμίες: M. / N.R. Smith κ.λπ.) και `signed_as_district()` («District Judge» → by designation).
+- **Πώς το κάνει (τεχνικά):** Ίδια υπογραφή με το parse_author → ονόματα πριν το επώνυμο· αλλιώς «Opinion by» · αλλιώς γραμμή «Before:» / «The Honorable … sitting by designation» (μόνο αν 1 όνομα).
+
+### judge_aliases.py
+- **Τι κάνει:** Κοινός πίνακας ταυτίσεων (Richman=Owen, Forrest=Hunsaker, Ramirez=Carrillo Ramirez) + διορθώσεις OCR (IKLUTA→IKUTA κ.ά.) + συμβατότητα αρχικών.
 
 ### enrich_ideology.py
 - **Τι κάνει:** Αποδίδει ιδεολογία· για SCOTUS και issue_area/decision_direction.
-- **Πώς το κάνει (τεχνικά):** SCOTUS→SCDB→Martin-Quinn (post_mn)· circuits→JuDJIS με Jaro-Winkler ≥0.92. Καθόλου LLM· unmatched μένουν κενά.
+- **Πώς το κάνει (τεχνικά):** SCOTUS→SCDB→Martin-Quinn (post_mn)· circuits→JuDJIS με **ακριβές επώνυμο** (+ταυτίσεις/OCR, όχι fuzzy από 2026-10-14)· εν ενεργεία στη `date_filed` (FJC) · αρχικά για συνωνυμίες · «District Judge» → όχι JuDJIS. `--circuits-only` = δεν αγγίζει SCOTUS. Καθόλου LLM· unmatched μένουν κενά.
 - **Πρόβλημα που λύνει:** Αξιόπιστη ιδεολογική επισήμανση από καθιερωμένες ακαδημαϊκές πηγές.
+
+### clean_headers.py
+- **Τι κάνει:** Αφαιρεί κεφαλίδες σελίδας PDF (CA5 ECF «Case: … Document: … Page: …», CA9 επαναλαμβανόμενο caption, ECF παραρτημάτων) από opinion/dissent/concurrence.
+- **Πρόβλημα που λύνει:** Θόρυβος στο κείμενο-στόχο. Μόνο ασφαλείς, πολύ συγκεκριμένοι κανόνες.
+
+### opinion_kind.py
+- **Τι κάνει:** Στήλη `opinion_kind` ∈ merits / summary_order / memorandum / per_curiam / order — καμία αφαίρεση.
+
+### ideology_fallback.py
+- **Τι κάνει:** `ideology_fallback` (JCS score, αλλιώς κόμμα Προέδρου από FJC), `ideology_fallback_source` (jcs / party / party_fjc), `author_visiting`.
+- **Πώς το κάνει (τεχνικά):** FJC: ίδιο circuit + εν ενεργεία στη date_filed (+αρχικά για συνωνυμίες)· by designation / «District Judge» → αναζήτηση σε όλα τα δικαστήρια (District Courts) → party_fjc. Δεν αλλάζει τα `ideology*`.
+
+### dedupe.py  *(του καθηγητή — ΑΜΕΤΑΒΛΗΤΟ, v2 2026-10-15)*
+- **Τι κάνει:** Τελευταίο βήμα: σελίδες σύγκρισης SCOTUS · σκουπίδια · ίδια κείμενα · WRONG_COURT_IDS · κείμενα που δεν είναι μόνο η πλειοψηφία · τροποποιημένες εκδόσεις (ίδιο όνομα) · σχεδόν ίδιες αποφάσεις με άλλο όνομα (Jaccard 5-grams όλου του κειμένου ≥ 0,5).
+
+### drop_wrong_court.py  *(πλεονάζει από το dedupe v2)*
+- **Τι κάνει:** Αφαιρεί υποθέσεις άλλου circuit βάσει `data/wrong_court.csv`.
+
+### Διαγνωστικά (μόνο ανάγνωση)
+- `check_authors.py` (ακρίβεια author_str) · `diag_unknown_authors.py` · `diag_round2.py` (αρχικά, ECF) · `export_unknown_authors.py` / `export_ids_context.py` (εξαγωγή για χειροκίνητη συμπλήρωση).
 
 ### lawma_label.py
 - **Τι κάνει:** Θεματική περιοχή (issue_area) στα circuits.
@@ -122,6 +152,8 @@
 ---
 
 ## Δεδομένα (`data/`, εκτός git)
+
+> **ΤΕΛΙΚΟ (2026-10-15):** `juribench_labeled.dedup.csv` του καθηγητή (9.347, μέσα στο `data.zip` στον φάκελο ΔΙΠΛΩΜΑΤΙΚΗ). Τα παρακάτω είναι ιστορικά. Στο git μόνο: `data/author_overrides.csv`, `data/wrong_court.csv`.
 
 ### juribench_dataset.csv
 - **Τι κάνει:** Το enriched & deduped dataset του επιβλέποντα.
