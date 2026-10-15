@@ -6,11 +6,6 @@
 
 ## Scripts (`code/`)
 
-### juribench_collect.py  *(παλιό — αντικαταστάθηκε από bulk_filter)*
-- **Τι κάνει:** Συλλέγει δικαστικές γνωμοδοτήσεις (SCOTUS/CA5/CA9).
-- **Πώς το κάνει (τεχνικά):** CourtListener search API, round-robin ανά μήνα, φιλτράρισμα per curiam & <500 λέξεων κατά τη συλλογή, resumable (skip seen cluster_ids).
-- **Πρόβλημα που λύνει:** Δημιουργεί αναπαραγώγιμα το πρωτογενές σώμα κειμένων.
-
 ### bulk_filter.py
 - **Τι κάνει:** Φτιάχνει το dataset από τα CourtListener bulk data (SCOTUS/CA5/CA9, Published, 2015–2024, ≥500 λέξεις, όχι per curiam).
 - **Πώς το κάνει (τεχνικά):** Streaming 3 περάσματα (dockets → clusters → opinions) σε bz2 χωρίς αποσυμπίεση των ~350GB· reader με `escapechar='\\'` (Postgres export)· 1 κύρια γνώμη ανά υπόθεση· ίδιες 12 στήλες με τον collector.
@@ -21,18 +16,10 @@
 - **Πώς το κάνει (τεχνικά):** Streaming των bulk opinions για τα cluster_ids μας, ένωση πολλαπλών με κενή γραμμή· γράφει dump `data/opinions_by_type.jsonl.gz` ώστε τα επόμενα τρεξίματα (`--from-dump`) να γίνονται σε λεπτά· διαβάζει πάντα από `juribench_cases.pre_split.csv`. Default = ακριβώς η οδηγία του καθηγητή· opt-in μόνο με έγκριση: `--text-split`, `--majority-fallback`, `--concur-in-part`.
 - **Πρόβλημα που λύνει:** Το παλιό `opinion_text` είχε ενωμένα majority + dissent + concurrence.
 
-### inspect_split.py
-- **Τι κάνει:** Έλεγχος ποιότητας του διαχωρισμού από το κείμενο (μόνο αν εγκριθεί το text-split).
-- **Πώς το κάνει (τεχνικά):** (1) υποθέσεις χωρίς διαχωρισμό που περιέχουν ύποπτη επικεφαλίδα γνώμης, (2) τυχαία δείγματα σημείων κοπής.
-- **Πρόβλημα που λύνει:** Ορατότητα στα λάθη του regex πριν χρησιμοποιηθεί.
-
 ### enrich_scdb.py
 - **Τι κάνει:** SCOTUS ↔ SCDB (αίτημα καθηγητή 2026-10-08): docket → usCite → όνομα+έτος· συμπληρώνει scdb_id, issue_area, decision_direction, ιδεολογία Martin-Quinn.
 - **Πώς το κάνει (τεχνικά):** Streaming bulk clusters (cluster→docket_id) + dockets (docket_number) + προαιρετικά citations (U.S.)· normalization docket (No./Nos., en dash, «Orig.»)· το scdb_id του CourtListener μόνο ως διασταύρωση· idempotent.
 - **Πρόβλημα που λύνει:** Το match όνομα+έτος αποτύγχανε σε διαφορετικές γραφές («SEC» vs «SECURITIES AND EXCHANGE COMMISSION», «Revisions: …») → 296 → ~700 / 720.
-
-### enrich_scdb_ids.py  *(παλιό — αντικαταστάθηκε από enrich_scdb)*
-- **Τι κάνει:** SCOTUS ↔ SCDB μόνο μέσω του scdb_id των bulk clusters (296/720 είχαν).
 
 ### completeness_report.py
 - **Τι κάνει:** Αναφορά πληρότητας για τον καθηγητή.
@@ -80,9 +67,6 @@
 
 ### drop_wrong_court.py  *(πλεονάζει από το dedupe v2)*
 - **Τι κάνει:** Αφαιρεί υποθέσεις άλλου circuit βάσει `data/wrong_court.csv`.
-
-### Διαγνωστικά (μόνο ανάγνωση)
-- `check_authors.py` (ακρίβεια author_str) · `diag_unknown_authors.py` · `diag_round2.py` (αρχικά, ECF) · `export_unknown_authors.py` / `export_ids_context.py` (εξαγωγή για χειροκίνητη συμπλήρωση).
 
 ### lawma_label.py
 - **Τι κάνει:** Θεματική περιοχή (issue_area) στα circuits.
@@ -144,10 +128,13 @@
 - **Πώς το κάνει (τεχνικά):** Coverage, κατανομές, flags για αραιά (N<10) κελιά.
 - **Πρόβλημα που λύνει:** Γρήγορη επισκόπηση ποιότητας πριν τα πειράματα.
 
-### validate_classifier.py  *(legacy)*
+### validate_classifier.py  *(legacy, από τον καθηγητή)*
 - **Τι κάνει:** Παλιός GPT ταξινομητής issue_area.
 - **Πώς το κάνει (τεχνικά):** OpenRouter, επικύρωση σε SCOTUS.
 - **Πρόβλημα που λύνει:** Προκάτοχος του lawma_label — δεν χρησιμοποιείται πλέον.
+
+### Αφαιρέθηκαν από το repo (2026-10-15)
+Παλιά ή μιας χρήσης scripts, που υπάρχουν στο ιστορικό του git: `juribench_collect.py` (αντικαταστάθηκε από το bulk_filter), `enrich_scdb_ids.py` (από το enrich_scdb), `inspect_split.py`, `check_authors.py`, `diag_unknown_authors.py`, `diag_round2.py`, `export_unknown_authors.py`, `export_ids_context.py` (διαγνωστικά, μόνο ανάγνωση).
 
 ---
 
@@ -189,8 +176,8 @@
 
 ## Έγγραφα & ρυθμίσεις
 
-### README.md · ROADMAP.md · RUN.md · CLAUDE.md
-- **Τι κάνει:** Τεκμηρίωση (επισκόπηση, πλάνο, οδηγίες εκτέλεσης, context για AI βοηθό).
+### README.md · RUN.md
+- **Τι κάνει:** Τεκμηρίωση (επισκόπηση, οδηγίες εκτέλεσης).
 - **Πώς το κάνει (τεχνικά):** Markdown στη ρίζα του repo.
 - **Πρόβλημα που λύνει:** Σαφήνεια, αναπαραγωγιμότητα, συνέχεια εργασίας.
 
@@ -199,7 +186,7 @@
 - **Πώς το κάνει (τεχνικά):** requirements-train για Colab/GPU· .env (μυστικά) εκτός git.
 - **Πρόβλημα που λύνει:** Στήσιμο περιβάλλοντος & προστασία μυστικών/μεγάλων αρχείων.
 
-### docs/ (issues.md, pipeline-notes.md, mynotes.md, professor-code-notes.md)
-- **Τι κάνει:** Σημειώσεις επιβλέποντα & pipeline.
+### docs/ (issues.md, professor-code-notes.md, pipeline-notes.md)
+- **Τι κάνει:** Σημειώσεις επιβλέποντα (issues, professor-code-notes) & pipeline.
 - **Πώς το κάνει (τεχνικά):** Markdown αναφοράς.
 - **Πρόβλημα που λύνει:** Ιστορικό αποφάσεων & αιτιολόγηση.

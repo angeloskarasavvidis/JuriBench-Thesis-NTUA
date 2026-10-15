@@ -19,3 +19,8 @@ results/
 
 # macOS
 .DS_Store
+
+# Τοπικά αρχεία εργασίας (δεν ανεβαίνουν: στοιχεία server, σημειώσεις, ημερολόγιο)
+CLAUDE.md
+tasks.md
+notes/
