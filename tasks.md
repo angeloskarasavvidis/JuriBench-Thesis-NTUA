@@ -59,7 +59,7 @@
 | R3-4 | `ideology_fallback`: «District Judge» → κατευθείαν by designation · μοναδικός τη μέρα → αγνόησε ασύμβατα αρχικά (Haynes, Southwick, Bea, McKeown, Wardlaw) | εγώ | ✅ κώδικας + test (+ «District Judge» → μόνο διορισμοί District Court στο FJC) | |
 | R3-5 | `dedupe.py` (καθηγητή, αμετάβλητο) τελευταίο βήμα → `juribench_cases.dedup.csv` + `dedupe_dropped.csv` | εγώ | ✅ test | Αναφορές/splits από το `.dedup.csv`. |
 | R3-6 | Tests → labrat → έλεγχος (8 cluster_ids, Thomas, αριθμοί) → email | εγώ + εσύ | ✅ 2026-10-14 · email στάλθηκε, αναμονή | 8 cluster_ids ✅ (Friedman P.L. → D party_fjc, Bennett R.D. → R party_fjc, χωρίς JuDJIS) · Thomas 37 με ημερομηνία ✅ · 5 λάθος αρχικά ✅ · overrides 163 (155 + 8 του καθηγητή) · JuDJIS 7.460 · fallback 8.576 · dedupe 10.395 → 9.725 (SCOTUS compare pages 61, όχι 12) · 8443025 = 1ου Circuit (Howard) → ερώτηση |
-| R3-7 | 10 υποθέσεις άλλου circuit (CA5: 8443025 1st · 8695046, 8695766, 8442964, 8443224 6th · 8697334 Fed. — CA9: 8695064, 8695543, 8695734, 8697254 10th) → να σβήνονται στο pipeline | εγώ + εσύ | 🔄 κώδικας ✅ (`drop_wrong_court.py`, λίστα `data/wrong_court.csv`, πριν από το dedupe) | Καθηγητής 2026-10-15. |
+| R3-7 | 10 υποθέσεις άλλου circuit (CA5: 8443025 1st · 8695046, 8695766, 8442964, 8443224 6th · 8697334 Fed. — CA9: 8695064, 8695543, 8695734, 8697254 10th) → να σβήνονται στο pipeline | εγώ + εσύ | ✅ 2026-10-15 — σβήστηκαν 10/10 · τελικό dedup: **9.715** (SCOTUS 667 · CA5 4.341 · CA9 4.707) | Καθηγητής 2026-10-15. Το `juribench_cases.csv` μένει ακέραιο· φιλτράρεται στο `.court_ok.csv`. |
 
 ## Q. Ερωτήσεις προς τον καθηγητή (ΔΕΝ υλοποιούνται πριν απαντήσει)
 

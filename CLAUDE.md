@@ -8,7 +8,7 @@
 
 ## ▶ ΞΕΚΙΝΑ ΑΠΟ ΕΔΩ — κατάσταση στις 2026-10-14 (βράδυ)
 
-**✅ 3ος γύρος (R3) έτρεξε.** Τελικό dataset: `data/juribench_cases.dedup.csv` (9.725). Απάντηση 2026-10-15: 10 υποθέσεις άλλου circuit (1st/6th/10th/Fed.) → `drop_wrong_court.py` + `data/wrong_court.csv`, πριν από το dedupe.
+**✅ 3ος γύρος (R3) έτρεξε.** Τελικό dataset: `data/juribench_cases.dedup.csv` (**9.715** μετά το drop_wrong_court, 2026-10-15). Απάντηση 2026-10-15: 10 υποθέσεις άλλου circuit (1st/6th/10th/Fed.) → `drop_wrong_court.py` + `data/wrong_court.csv`, πριν από το dedupe.
 Επόμενο μετά την απάντηση: splits / finetune data (C7) από το `.dedup.csv`.
 Ανοιχτό: 8443025 (Cruz-Vázquez) είναι απόφαση 1ου Circuit μέσα στο CA5.
 
