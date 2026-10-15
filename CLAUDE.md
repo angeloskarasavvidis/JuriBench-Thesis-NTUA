@@ -8,7 +8,8 @@
 
 ## ▶ ΞΕΚΙΝΑ ΑΠΟ ΕΔΩ — κατάσταση στις 2026-10-14 (βράδυ)
 
-**✅ 3ος γύρος (R3) έτρεξε.** Τελικό dataset: `data/juribench_cases.dedup.csv` (9.725). Email στον καθηγητή εκκρεμεί.
+**✅ 3ος γύρος (R3) έτρεξε.** Τελικό dataset: `data/juribench_cases.dedup.csv` (9.725). Απάντηση 2026-10-15: 10 υποθέσεις άλλου circuit (1st/6th/10th/Fed.) → `drop_wrong_court.py` + `data/wrong_court.csv`, πριν από το dedupe.
+Επόμενο μετά την απάντηση: splits / finetune data (C7) από το `.dedup.csv`.
 Ανοιχτό: 8443025 (Cruz-Vázquez) είναι απόφαση 1ου Circuit μέσα στο CA5.
 
 (παλαιότερο:)
@@ -40,7 +41,8 @@ python code/enrich_authors.py --input data/juribench_cases.csv --output data/jur
 python code/opinion_kind.py
 python code/enrich_ideology.py --circuits-only --input data/juribench_cases.csv --output data/juribench_cases.csv
 python code/ideology_fallback.py
-python code/dedupe.py --input data/juribench_cases.csv --output data/juribench_cases.dedup.csv --dropped data/dedupe_dropped.csv   # ΤΕΛΕΥΤΑΙΟ
+python code/drop_wrong_court.py --input data/juribench_cases.csv --output data/juribench_cases.court_ok.csv   # λίστα: data/wrong_court.csv
+python code/dedupe.py --input data/juribench_cases.court_ok.csv --output data/juribench_cases.dedup.csv --dropped data/dedupe_dropped.csv   # ΤΕΛΕΥΤΑΙΟ
 python code/completeness_report.py --input data/juribench_cases.dedup.csv --md data/completeness_report.md
 ```
 Το τελικό dataset είναι το **`juribench_cases.dedup.csv`** (splits / finetune από αυτό). `enrich_scdb.py` μόνο αν

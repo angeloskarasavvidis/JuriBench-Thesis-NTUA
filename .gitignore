@@ -10,6 +10,7 @@ __pycache__/
 # Δεδομένα (μεγάλα / τρίτων — παράγονται από το pipeline, δεν μπαίνουν σε git)
 data/*
 !data/author_overrides.csv
+!data/wrong_court.csv
 
 # Artifacts εκπαίδευσης/αξιολόγησης (παράγονται στο Colab)
 adapters/
