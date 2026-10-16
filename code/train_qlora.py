@@ -57,7 +57,8 @@ def main():
             "Δεν βρέθηκε GPU. Στο Colab: Runtime → Change runtime type → GPU (T4/L4/A100), "
             "και ξανατρέξε. (QLoRA χρειάζεται CUDA.)")
     # T4 (Turing) δεν υποστηρίζει bf16· A100/L4 (Ampere+) υποστηρίζουν.
-    use_bf16 = torch.cuda.is_bf16_supported()
+    # το is_bf16_supported() απαντά True και στην T4 (προσομοίωση), αλλά η εκπαίδευση σκάει → γενιά κάρτας
+    use_bf16 = torch.cuda.get_device_capability()[0] >= 8
     compute_dtype = torch.bfloat16 if use_bf16 else torch.float16
     print(f"GPU: {torch.cuda.get_device_name(0)} | bf16={use_bf16} (αλλιώς fp16)")
 
@@ -96,7 +97,7 @@ def main():
                              bnb_4bit_use_double_quant=True,
                              bnb_4bit_compute_dtype=compute_dtype)
     model = AutoModelForCausalLM.from_pretrained(
-        args.model, quantization_config=bnb, device_map="auto")
+        args.model, quantization_config=bnb, device_map="auto", torch_dtype=compute_dtype)
     model = prepare_model_for_kbit_training(model)
     model.config.use_cache = False
 
@@ -127,6 +128,10 @@ def main():
     if "processing_class" in tsig: tkw["processing_class"] = tok
     elif "tokenizer" in tsig:      tkw["tokenizer"] = tok
     trainer = SFTTrainer(**tkw)
+    # LoRA πίνακες σε fp32: αλλιώς ο fp16 scaler σκάει στην T4 (μοντέλα αποθηκευμένα σε bf16, π.χ. Llama-3.1)
+    for prm in trainer.model.parameters():
+        if prm.requires_grad:
+            prm.data = prm.data.float()
 
     trainer.train()
     trainer.save_model(args.out)
