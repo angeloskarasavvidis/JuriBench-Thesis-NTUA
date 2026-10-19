@@ -63,6 +63,9 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--max-new-tokens", type=int, default=None)
     ap.add_argument("--max-samples", type=int, default=0)
+    # προαιρετικά (default = καμία αλλαγή): σταματούν βρόχους επανάληψης στο generation
+    ap.add_argument("--repetition-penalty", type=float, default=1.0)
+    ap.add_argument("--no-repeat-ngram", type=int, default=0)
     args = ap.parse_args()
 
     import torch
@@ -95,7 +98,9 @@ def main():
             plen = enc["input_ids"].shape[1]
             with torch.no_grad():
                 out = model.generate(**enc, max_new_tokens=max_new, do_sample=False,
-                                     pad_token_id=tok.pad_token_id)
+                                     pad_token_id=tok.pad_token_id,
+                                     repetition_penalty=args.repetition_penalty,
+                                     no_repeat_ngram_size=args.no_repeat_ngram)
             gen = tok.decode(out[0][plen:], skip_special_tokens=True).strip()
             meta = r["meta"]
             rec = {

@@ -28,7 +28,29 @@ Usage:
 
 import argparse
 import json
+import re
 from pathlib import Path
+
+# Προαιρετικό (--strip-header, default off): κόβει την κεφαλίδα (caption, σύνθεση, δικηγόροι) από τον στόχο
+# του generation, ώστε να ξεκινά από το κυρίως κείμενο. Το dataset ΔΕΝ αλλάζει.
+STRIP_HEADER = False
+# κατά σειρά προτεραιότητας: η πρώτη που ταιριάζει κερδίζει
+BODY_START = [
+    re.compile(r"\bOPINION\s+(?=[A-Z][A-Za-z'’.\- ]{1,40},\s+(?:Chief\s+|Senior\s+)?(?:Circuit|District)\s+Judge)"),
+    re.compile(r"(?:Chief\s+)?Justice\s+[A-Z][A-Za-z'’]+\s*delivered\s+the\s+opinion"),
+    re.compile(r"\b(?:[A-Z]\.\s*){0,2}[A-Z][A-Za-z'’\-]+(?:\s+[A-Z]\.)?(?:\s+[A-Z][A-Za-z'’\-]+)?,"
+               r"\s+(?:Chief\s+|Senior\s+)?(?:Circuit|District)\s+Judges?:"),
+    re.compile(r"\bPER\s+CURIAM\s*[:.]"),
+]
+MAX_HEADER = 15000   # αν η αρχή βρεθεί πιο μετά, μάλλον λάθος ταίριασμα -> κράτα όλο το κείμενο
+
+
+def strip_header(op):
+    for pat in BODY_START:
+        m = pat.search(op[:MAX_HEADER])
+        if m:
+            return op[m.start():]
+    return op
 
 DISPOSITIONS = ["affirmed", "reversed", "vacated", "remanded", "affirmed_in_part",
                 "dismissed", "denied", "granted", "mixed", "other", "unclear"]
@@ -60,6 +82,8 @@ def user_prompt(rec, include_ideology):
 def gen_target(rec, max_chars):
     t = rec["targets"]
     op = t.get("opinion_text_capped") or t.get("opinion_text") or ""
+    if STRIP_HEADER:
+        op = strip_header(t.get("opinion_text") or op)
     if max_chars and len(op) > max_chars:
         op = op[:max_chars]
     disp = t.get("disposition", "unclear")
@@ -121,7 +145,11 @@ def main():
     ap.add_argument("--task", choices=["generation", "predict", "both"], default="both")
     ap.add_argument("--max-target-chars", type=int, default=0)
     ap.add_argument("--include-ideology", action="store_true")
+    ap.add_argument("--strip-header", action="store_true",
+                    help="generation: ο στόχος ξεκινά από το κυρίως κείμενο (όχι caption/σύνθεση)")
     args = ap.parse_args()
+    global STRIP_HEADER
+    STRIP_HEADER = args.strip_header
 
     root = Path(__file__).parent.parent
     splits_dir = Path(args.splits) if args.splits else root / "data" / "splits"
